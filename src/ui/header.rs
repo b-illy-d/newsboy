@@ -1,6 +1,6 @@
 use tui::{
     backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
@@ -8,18 +8,17 @@ use tui::{
 };
 
 const LOGO: &str = r#"
-| |\ | | |_  \ \    /( (` | |_) / / \ \ \_/ 
-|_| \| |_|__  \_\/\/ _)_) |_|_) \_\_/  |_|  
- "#;
+▄▄▄▄  ▗▞▀▚▖▄   ▄  ▄▄▄ ▗▖    ▄▄▄  ▄   ▄
+█   █ ▐▛▀▀▘█ ▄ █ ▀▄▄  ▐▌   █   █ █   █
+█   █ ▝▚▄▄▖█▄█▄█ ▄▄▄▀ ▐▛▀▚▖▀▄▄▄▀  ▀▀▀█
+                      ▐▙▄▞▘      ▄   █
+                                  ▀▀▀ 
+"#;
 
 pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50),
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
-        ])
+        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
         .split(area);
 
     draw_logo(f, chunks[0]);
@@ -29,42 +28,42 @@ pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
 fn draw_logo<B: Backend>(f: &mut Frame<B>, area: Rect) {
     let logo_paragraph = Paragraph::new(LOGO)
         .block(Block::default().borders(Borders::NONE))
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Blue));
+        .style(Style::default().fg(Color::LightBlue));
 
     f.render_widget(logo_paragraph, area);
 }
 
 fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-        ])
-        .split(area);
+    let items = split_vec_into_n(
+        vec![
+            ("q", "Quit application"),
+            ("c", "Open console to view logs"),
+            ("r", "Refresh topics list"),
+            ("/", "Toggle filter mode"),
+            ("j/↓", "Navigate down"),
+            ("k/↑", "Navigate up"),
+            ("ESC", "Exit filter mode or close this help"),
+        ],
+        3,
+    );
 
-    // Define the help items (triplets)
-    let items: [Vec<(&str, &str)>; 3] = split_vec_into_three(vec![
-        ("q", "Quit application"),
-        ("c", "Open console to view logs"),
-        ("r", "Refresh topics list"),
-        ("/", "Toggle filter mode"),
-        ("j/↓", "Navigate down"),
-        ("k/↑", "Navigate up"),
-        ("?", "Show/hide this help"),
-        ("ESC", "Exit filter mode or close this help"),
-    ]);
+    let outer_block = Block::default().borders(Borders::ALL).title(Span::styled(
+        " Keyboard Shortcuts ",
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    ));
 
-    // Render each column
-    for (i, col) in chunks.into_iter().enumerate() {
-        let block = Block::default().borders(Borders::ALL).title(Span::styled(
-            " Keyboard Shortcuts ",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ));
+    let inner_area = outer_block.inner(area); // area is the full Rect
+    f.render_widget(outer_block, area);
+
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(33); 3])
+        .split(inner_area);
+
+    // Then render each column without borders
+    for (i, col) in columns.into_iter().enumerate() {
         let text = items[i]
             .iter()
             .map(|&(key, desc)| {
@@ -74,20 +73,24 @@ fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
                 ])
             })
             .collect::<Vec<_>>();
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .wrap(tui::widgets::Wrap { trim: true });
+        let paragraph = Paragraph::new(text).wrap(tui::widgets::Wrap { trim: true });
+
         f.render_widget(paragraph, col);
     }
 }
 
-fn split_vec_into_three<T: Clone>(vec: Vec<T>) -> [Vec<T>; 3] {
+fn split_vec_into_n<T: Clone>(vec: Vec<T>, n: usize) -> Vec<Vec<T>> {
     let len = vec.len();
-    let chunk_size = (len + 2) / 3;
-
-    let col1 = vec[0..chunk_size.min(len)].to_vec();
-    let col2 = vec[chunk_size.min(len)..(2 * chunk_size).min(len)].to_vec();
-    let col3 = vec[(2 * chunk_size).min(len)..].to_vec();
-
-    [col1, col2, col3]
+    let chunk_size = (len + n - 1) / n;
+    let mut result = Vec::with_capacity(n);
+    for i in 0..n {
+        let start = i * chunk_size;
+        let end = std::cmp::min(start + chunk_size, len);
+        if start < len {
+            result.push(vec[start..end].to_vec());
+        } else {
+            result.push(vec![]);
+        }
+    }
+    result
 }

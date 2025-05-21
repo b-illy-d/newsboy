@@ -14,47 +14,51 @@ use crate::app::App;
 use header::draw_header;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App) {
-    if app.show_console {
-        draw_with_console(f, app);
-    } else {
-        draw_without_console(f, app);
-    }
-}
-
-fn draw_with_console<B: Backend>(f: &mut Frame<B>, app: &App) {
-    // Create main layout
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(3),  // Header
+            Constraint::Length(7), // Header
+            Constraint::Min(0),
+        ])
+        .split(f.size());
+
+    draw_header(f, chunks[0]);
+    if app.show_console {
+        draw_with_console(f, app, chunks[1]);
+    } else {
+        draw_without_console(f, app, chunks[1]);
+    }
+}
+
+fn draw_with_console<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+    // Create main layout
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
             Constraint::Min(0),     // Main content
             Constraint::Length(3),  // Status bar
             Constraint::Length(11), // Console
         ])
-        .split(f.size());
+        .split(area);
 
-    draw_header(f, chunks[0]);
-    draw_main_content(f, app, chunks[1]);
-    draw_status_bar(f, app, chunks[2]);
-    draw_console(f, app, chunks[3]);
+    draw_main_content(f, app, chunks[0]);
+    draw_status_bar(f, app, chunks[1]);
+    draw_console(f, app, chunks[2]);
 }
 
-fn draw_without_console<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_without_console<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     // Create main layout
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(1)
         .constraints([
-            Constraint::Length(3), // Header
             Constraint::Min(0),    // Main content
             Constraint::Length(3), // Status bar
         ])
-        .split(f.size());
+        .split(area);
 
-    draw_header(f, chunks[0]);
-    draw_main_content(f, app, chunks[1]);
-    draw_status_bar(f, app, chunks[2]);
+    draw_main_content(f, app, chunks[0]);
+    draw_status_bar(f, app, chunks[1]);
 }
 
 fn draw_main_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
@@ -149,23 +153,7 @@ fn draw_topic_details<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
 
 fn draw_status_bar<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     let status_span = Span::styled(app.status_text.clone(), Style::default().fg(Color::Yellow));
-    let cheat_sheet_text = Spans::from(vec![
-        Span::styled(" q ", Style::default().bg(Color::DarkGray)),
-        Span::raw(" Quit | "),
-        Span::styled(" / ", Style::default().bg(Color::DarkGray)),
-        Span::raw(" Filter | "),
-        Span::styled(" r ", Style::default().bg(Color::DarkGray)),
-        Span::raw(" Refresh | "),
-        Span::styled(" ? ", Style::default().bg(Color::DarkGray)),
-        Span::raw(" Help"),
-    ]);
-
-    let spaces = " ".repeat(area.width as usize - status_span.content.len() - 1);
-    let status_text = vec![
-        Spans::from(status_span),
-        Spans::from(spaces),
-        Spans::from(cheat_sheet_text),
-    ];
+    let status_text = vec![Spans::from(status_span)];
 
     let status_bar = Paragraph::new(status_text)
         .block(Block::default().borders(Borders::ALL))

@@ -209,30 +209,7 @@ impl App {
         });
     }
 
-    fn debug_log(&mut self, message: &str) {
-        self.debug_logs.push(message.to_string());
-    }
-
     fn set_status_text(&mut self, text: &str) {
         self.status_text = text.to_string();
-    }
-
-    fn visible_topics(&self) -> Vec<&TopicInfo> {
-        if !self.filter_active {
-            return self.topics.iter().collect();
-        }
-        self.topics
-            .iter()
-            .filter(|topic| {
-                if self.filter_active {
-                    topic
-                        .name
-                        .to_lowercase()
-                        .contains(&self.filter_text.to_lowercase())
-                } else {
-                    true
-                }
-            })
-            .collect()
     }
 }
