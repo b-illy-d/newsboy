@@ -5,7 +5,7 @@ use tui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -34,7 +34,7 @@ fn draw_with_console<B: Backend>(f: &mut Frame<B>, app: &App) {
         ])
         .split(f.size());
 
-    draw_header(f, app, chunks[0]);
+    draw_header(f, chunks[0]);
     draw_main_content(f, app, chunks[1]);
     draw_status_bar(f, app, chunks[2]);
     draw_console(f, app, chunks[3]);
@@ -52,14 +52,9 @@ fn draw_without_console<B: Backend>(f: &mut Frame<B>, app: &App) {
         ])
         .split(f.size());
 
-    draw_header(f, app, chunks[0]);
+    draw_header(f, chunks[0]);
     draw_main_content(f, app, chunks[1]);
     draw_status_bar(f, app, chunks[2]);
-
-    // Draw help modal on top if active
-    if app.show_help {
-        draw_help_modal(f, app, f.size());
-    }
 }
 
 fn draw_main_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {

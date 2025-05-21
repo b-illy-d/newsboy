@@ -2,6 +2,7 @@ use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -11,7 +12,7 @@ const LOGO: &str = r#"
 |_| \| |_|__  \_\/\/ _)_) |_|_) \_\_/  |_|  
  "#;
 
-pub fn draw_header<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -22,7 +23,7 @@ pub fn draw_header<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
         .split(area);
 
     draw_logo(f, chunks[0]);
-    draw_help(f, app, chunks[1]);
+    draw_help(f, chunks[1]);
 }
 
 fn draw_logo<B: Backend>(f: &mut Frame<B>, area: Rect) {
@@ -34,7 +35,7 @@ fn draw_logo<B: Backend>(f: &mut Frame<B>, area: Rect) {
     f.render_widget(logo_paragraph, area);
 }
 
-fn draw_help<B: Backend>(f: &mut Frame<B>, _app: &App, area: Rect) {
+fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -45,7 +46,7 @@ fn draw_help<B: Backend>(f: &mut Frame<B>, _app: &App, area: Rect) {
         .split(area);
 
     // Define the help items (triplets)
-    let items = split_vec_into_three(vec![
+    let items: [Vec<(&str, &str)>; 3] = split_vec_into_three(vec![
         ("q", "Quit application"),
         ("c", "Open console to view logs"),
         ("r", "Refresh topics list"),
@@ -64,20 +65,29 @@ fn draw_help<B: Backend>(f: &mut Frame<B>, _app: &App, area: Rect) {
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ));
-        let paragraph = Paragraph::new(col)
+        let text = items[i]
+            .iter()
+            .map(|&(key, desc)| {
+                Spans::from(vec![
+                    Span::styled(format!("{}: ", key), Style::default().fg(Color::Yellow)),
+                    Span::raw(desc),
+                ])
+            })
+            .collect::<Vec<_>>();
+        let paragraph = Paragraph::new(text)
             .block(block)
             .wrap(tui::widgets::Wrap { trim: true });
         f.render_widget(paragraph, col);
     }
 }
 
-fn split_vec_into_three<T>(vec: Vec<T>) -> (Vec<T>, Vec<T>, Vec<T>) {
+fn split_vec_into_three<T: Clone>(vec: Vec<T>) -> [Vec<T>; 3] {
     let len = vec.len();
     let chunk_size = (len + 2) / 3;
 
-    let col1 = vec[0..chunk_size].to_vec();
-    let col2 = vec[chunk_size..(2 * chunk_size)].to_vec();
-    let col3 = vec[(2 * chunk_size)..].to_vec();
+    let col1 = vec[0..chunk_size.min(len)].to_vec();
+    let col2 = vec[chunk_size.min(len)..(2 * chunk_size).min(len)].to_vec();
+    let col3 = vec[(2 * chunk_size).min(len)..].to_vec();
 
-    (col1, col2, col3)
+    [col1, col2, col3]
 }
