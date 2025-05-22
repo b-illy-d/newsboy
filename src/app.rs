@@ -3,17 +3,20 @@ use crossterm::event::{self, Event, KeyCode};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
+use crate::components::TopicsList;
 use crate::pubsub::{PubSubClient, TopicInfo};
 use crate::ui;
 
+enum Components {
+    TopicsList,
+    TopicDetails,
+    TopicSubscriptions,
+}
+
 pub struct App {
     pub pubsub_client: PubSubClient,
-    pub topics: Vec<TopicInfo>,
-    pub visible_topics: Vec<TopicInfo>,
-    pub selected_topic_index: Option<usize>,
+    pub active_component: Components,
     pub should_quit: bool,
-    pub filter_active: bool,
-    pub filter_text: String,
     pub project_id: String,
     pub show_help: bool,
     pub show_console: bool,
@@ -25,56 +28,14 @@ impl App {
     pub fn new(project_id: &str, pubsub_client: PubSubClient) -> Result<Self> {
         Ok(Self {
             pubsub_client,
-            topics: Vec::new(),
-            visible_topics: Vec::new(),
-            selected_topic_index: None,
+            active_component: Components::TopicsList,
             should_quit: false,
-            filter_active: false,
-            filter_text: String::new(),
             project_id: project_id.to_owned(),
             show_help: false,
             show_console: false,
             debug_logs: Vec::new(),
             status_text: String::new(),
         })
-    }
-
-    async fn refresh_topics(&mut self) -> Result<()> {
-        self.set_status_text("Refreshing...");
-        let topics = self.pubsub_client.list_topics().await?;
-        self.set_status_text(&format!("Found {} Topics", topics.len()));
-        self.topics = topics;
-        self.filter_and_sort_topics();
-        Ok(())
-    }
-
-    fn filter_and_sort_topics(&mut self) {
-        if !self.filter_active || self.filter_text.is_empty() {
-            self.visible_topics = self.topics.clone();
-            self.visible_topics.sort_by(|a, b| a.name.cmp(&b.name));
-            return;
-        }
-        let filter_text = self.filter_text.to_lowercase();
-        self.visible_topics = self
-            .topics
-            .iter()
-            .filter(|topic| topic.name.to_lowercase().contains(&filter_text))
-            .cloned()
-            .collect();
-        self.visible_topics.sort_by(|a, b| a.name.cmp(&b.name));
-        self.update_selected_topic_index();
-    }
-
-    fn update_selected_topic_index(&mut self) {
-        if let Some(index) = self.selected_topic_index {
-            if index >= self.topics.len() {
-                self.selected_topic_index = if self.topics.is_empty() {
-                    None
-                } else {
-                    Some(self.topics.len() - 1)
-                };
-            }
-        }
     }
 
     pub async fn run(&mut self) -> Result<()> {

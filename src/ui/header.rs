@@ -8,17 +8,17 @@ use tui::{
 };
 
 const LOGO: &str = r#"
-▄▄▄▄  ▗▞▀▚▖▄   ▄  ▄▄▄ ▗▖    ▄▄▄  ▄   ▄
-█   █ ▐▛▀▀▘█ ▄ █ ▀▄▄  ▐▌   █   █ █   █
-█   █ ▝▚▄▄▖█▄█▄█ ▄▄▄▀ ▐▛▀▚▖▀▄▄▄▀  ▀▀▀█
-                      ▐▙▄▞▘      ▄   █
-                                  ▀▀▀ 
+ ▄▄▄▄  ▗▞▀▚▖▄   ▄  ▄▄▄ ▗▖    ▄▄▄  ▄   ▄
+ █   █ ▐▛▀▀▘█ ▄ █ ▀▄▄  ▐▌   █   █ █   █
+ █   █ ▝▚▄▄▖█▄█▄█ ▄▄▄▀ ▐▛▀▚▖▀▄▄▄▀  ▀▀▀█
+                       ▐▙▄▞▘      ▄   █
+                                   ▀▀▀ 
 "#;
 
 pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
+        .constraints([Constraint::Length(40), Constraint::Min(0)])
         .split(area);
 
     draw_logo(f, chunks[0]);

@@ -74,35 +74,6 @@ fn draw_main_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     draw_topic_details(f, app, chunks[1]);
 }
 
-fn draw_topic_list<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
-    let topics: Vec<ListItem> = app
-        .visible_topics
-        .iter()
-        .map(|topic| ListItem::new(topic.name.clone()))
-        .collect();
-
-    let filter_title = if app.filter_active {
-        format!(" Topics [ Search: {} ] ", app.filter_text)
-    } else {
-        " Topics ".to_string()
-    };
-
-    let topics_list = List::new(topics)
-        .block(Block::default().title(filter_title).borders(Borders::ALL))
-        .style(Style::default().fg(Color::White))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("> ");
-
-    let mut list_state = tui::widgets::ListState::default();
-    list_state.select(app.selected_topic_index);
-    f.render_stateful_widget(topics_list, area, &mut list_state);
-}
-
 fn draw_topic_details<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     let detail_block = Block::default()
         .title(" Topic Details ")

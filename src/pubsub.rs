@@ -25,7 +25,7 @@ impl PubSubClient {
 
         // For emulator, use config with explicit project ID
         let mut config = ClientConfig::default();
-        
+
         // Set the project ID in the config
         config.project_id = Some(project_id.to_string());
 
@@ -33,7 +33,10 @@ impl PubSubClient {
             "Failed to create PubSub client - is the emulator running at the specified address?",
         )?;
 
-        debug!("PubSub client created successfully with project ID: {}", project_id);
+        debug!(
+            "PubSub client created successfully with project ID: {}",
+            project_id
+        );
 
         Ok(Self {
             client,
@@ -51,7 +54,8 @@ impl PubSubClient {
         debug!("Using parent path: {}", parent_path);
 
         // Get emulator host for logging
-        let emulator_host = env::var("PUBSUB_EMULATOR_HOST").unwrap_or_else(|_| "<not set>".to_string());
+        let emulator_host =
+            env::var("PUBSUB_EMULATOR_HOST").unwrap_or_else(|_| "<not set>".to_string());
         debug!("PubSub emulator host: {}", emulator_host);
 
         // List topics with the get_topics method
