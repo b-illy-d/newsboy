@@ -1,8 +1,8 @@
-use tui::{
+use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -15,7 +15,7 @@ const LOGO: &str = r#"
                                    ▀▀▀ 
 "#;
 
-pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
+pub fn draw_header(f: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(40), Constraint::Min(0)])
@@ -25,7 +25,7 @@ pub fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect) {
     draw_help(f, chunks[1]);
 }
 
-fn draw_logo<B: Backend>(f: &mut Frame<B>, area: Rect) {
+fn draw_logo(f: &mut Frame, area: Rect) {
     let logo_paragraph = Paragraph::new(LOGO)
         .block(Block::default().borders(Borders::NONE))
         .style(Style::default().fg(Color::LightBlue));
@@ -33,7 +33,7 @@ fn draw_logo<B: Backend>(f: &mut Frame<B>, area: Rect) {
     f.render_widget(logo_paragraph, area);
 }
 
-fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
+fn draw_help(f: &mut Frame, area: Rect) {
     let items = split_vec_into_n(
         vec![
             ("q", "Quit application"),
@@ -64,18 +64,20 @@ fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
 
     // Then render each column without borders
     for (i, col) in columns.into_iter().enumerate() {
-        let text = items[i]
+        let text = Text::from(
+            items[i]
             .iter()
             .map(|&(key, desc)| {
-                Spans::from(vec![
+                Line::from(vec![
                     Span::styled(format!("{}: ", key), Style::default().fg(Color::Yellow)),
                     Span::raw(desc),
                 ])
             })
-            .collect::<Vec<_>>();
-        let paragraph = Paragraph::new(text).wrap(tui::widgets::Wrap { trim: true });
+            .collect::<Vec<_>>()
+        );
+        let paragraph = Paragraph::new(text).wrap(ratatui::widgets::Wrap { trim: true });
 
-        f.render_widget(paragraph, col);
+        f.render_widget(paragraph, *col);
     }
 }
 

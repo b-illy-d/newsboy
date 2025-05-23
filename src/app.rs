@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode};
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 
 use crate::components::TopicsList;
 use crate::pubsub::{PubSubClient, TopicInfo};
@@ -22,6 +22,11 @@ pub struct App {
     pub show_console: bool,
     pub debug_logs: Vec<String>,
     pub status_text: String,
+    pub selected_topic_index: Option<usize>,
+    pub filter_active: bool,
+    pub filter_text: String,
+    pub topics: Vec<TopicInfo>,
+    pub visible_topics: Vec<TopicInfo>,
 }
 
 impl App {
@@ -35,6 +40,11 @@ impl App {
             show_console: false,
             debug_logs: Vec::new(),
             status_text: String::new(),
+            selected_topic_index: None,
+            filter_active: false,
+            filter_text: String::new(),
+            topics: Vec::new(),
+            visible_topics: Vec::new(),
         })
     }
 
@@ -56,7 +66,7 @@ impl App {
         result
     }
 
-    async fn run_app<B: tui::backend::Backend>(
+    async fn run_app<B: ratatui::backend::Backend>(
         &mut self,
         terminal: &mut Terminal<B>,
     ) -> Result<()> {
@@ -131,7 +141,7 @@ impl App {
         Ok(())
     }
 
-    fn restore_terminal<B: tui::backend::Backend + std::io::Write>(
+    fn restore_terminal<B: ratatui::backend::Backend + std::io::Write>(
         &mut self,
         terminal: &mut Terminal<B>,
     ) -> Result<()> {
@@ -172,5 +182,43 @@ impl App {
 
     fn set_status_text(&mut self, text: &str) {
         self.status_text = text.to_string();
+    }
+    
+    async fn refresh_topics(&mut self) -> Result<()> {
+        self.set_status_text("Refreshing...");
+        let topics = self.pubsub_client.list_topics().await?;
+        self.set_status_text(&format!("Found {} Topics", topics.len()));
+        self.topics = topics;
+        self.filter_and_sort_topics();
+        Ok(())
+    }
+
+    fn filter_and_sort_topics(&mut self) {
+        if !self.filter_active || self.filter_text.is_empty() {
+            self.visible_topics = self.topics.clone();
+            self.visible_topics.sort_by(|a, b| a.name.cmp(&b.name));
+            return;
+        }
+        let filter_text = self.filter_text.to_lowercase();
+        self.visible_topics = self
+            .topics
+            .iter()
+            .filter(|topic| topic.name.to_lowercase().contains(&filter_text))
+            .cloned()
+            .collect();
+        self.visible_topics.sort_by(|a, b| a.name.cmp(&b.name));
+        self.update_selected_topic_index();
+    }
+
+    fn update_selected_topic_index(&mut self) {
+        if let Some(index) = self.selected_topic_index {
+            if index >= self.visible_topics.len() {
+                self.selected_topic_index = if self.visible_topics.is_empty() {
+                    None
+                } else {
+                    Some(self.visible_topics.len() - 1)
+                };
+            }
+        }
     }
 }

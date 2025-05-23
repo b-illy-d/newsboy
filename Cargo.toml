@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tui = "0.19"
+futures = "0.3"
+ratatui = "0.24.0"
 crossterm = "0.25"
 google-cloud-pubsub = "0.16"
 tokio = { version = "1", features = ["full"] }

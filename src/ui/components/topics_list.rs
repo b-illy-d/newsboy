@@ -86,7 +86,7 @@ impl TopicsList {
             )
             .highlight_symbol("> ");
 
-        let mut list_state = tui::widgets::ListState::default();
+        let mut list_state = ratatui::widgets::ListState::default();
         list_state.select(app.selected_topic_index);
         f.render_stateful_widget(topics_list, area, &mut list_state);
     }

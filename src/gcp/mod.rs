@@ -17,33 +17,6 @@ pub struct TopicInfo {
 }
 
 impl PubSubClient {
-    pub async fn new(project_id: &str) -> Result<Self> {
-        // Verify emulator is configured
-        let emulator_host = env::var("PUBSUB_EMULATOR_HOST")
-            .context("PUBSUB_EMULATOR_HOST environment variable not set")?;
-        debug!("Using PubSub emulator at {}", emulator_host);
-
-        // For emulator, use config with explicit project ID
-        let mut config = ClientConfig::default();
-
-        // Set the project ID in the config
-        config.project_id = Some(project_id.to_string());
-
-        let client = Client::new(config).await.context(
-            "Failed to create PubSub client - is the emulator running at the specified address?",
-        )?;
-
-        debug!(
-            "PubSub client created successfully with project ID: {}",
-            project_id
-        );
-
-        Ok(Self {
-            client,
-            project_id: project_id.to_string(),
-        })
-    }
-
     pub async fn list_topics(&self) -> Result<Vec<TopicInfo>> {
         debug!("Fetching topics for project {}", self.project_id);
 
