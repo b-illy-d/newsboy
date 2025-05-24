@@ -21,12 +21,14 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(11), // Header
-            Constraint::Min(0),     // Main content
+            Constraint::Length(9), // Header
+            Constraint::Min(0),    // Main content
+            Constraint::Length(3), // Footer
         ])
         .split(area);
     draw_header(f, chunks[0]);
     draw_main_content(f, app, chunks[1]);
+    draw_footer(f, app, chunks[2]);
 }
 
 fn draw_main_content(f: &mut Frame, app: &App, area: Rect) {
@@ -39,4 +41,13 @@ fn draw_main_content(f: &mut Frame, app: &App, area: Rect) {
         .split(area);
 
     app.topics.view(f, chunks[0], app);
+}
+
+fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
+    let footer = format!("Ticks {}", app.ticks);
+    let footer_paragraph = ratatui::widgets::Paragraph::new(footer)
+        .block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::NONE))
+        .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
+
+    f.render_widget(footer_paragraph, area);
 }

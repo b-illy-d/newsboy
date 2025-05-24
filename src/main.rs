@@ -32,13 +32,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         });
     }
 
-    // keyboard producer (blocking, in a std thread)
+    // keyboard producer (async, no blocking)
     {
         let tx = tx.clone();
-        std::thread::spawn(move || {
-            while let Ok(true) = poll(Duration::from_millis(50)) {
-                if let CEvent::Key(k) = read().unwrap() {
-                    futures::executor::block_on(tx.send(Event::Input(k))).ok();
+        tokio::spawn(async move {
+            loop {
+                if poll(Duration::from_millis(50)).unwrap() {
+                    if let CEvent::Key(k) = read().unwrap() {
+                        if tx.send(Event::Input(k)).await.is_err() {
+                            break;
+                        }
+                    }
                 }
             }
         });

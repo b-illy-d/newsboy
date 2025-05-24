@@ -14,6 +14,7 @@ pub struct App {
     pub route: Route,
     pub topics: TopicsComponent,
     pub subscriptions: SubscriptionsComponent,
+    pub ticks: u64,
     pub last_tick: Instant,
     pub tx: Sender<Event>,
 }
@@ -24,21 +25,26 @@ impl App {
             route: Route::Topics,
             topics: TopicsComponent::new(),
             subscriptions: SubscriptionsComponent::new(),
+            ticks: 0,
             last_tick: Instant::now(),
             tx,
         }
     }
 
     pub fn on_tick(&mut self) {
+        self.ticks += 1;
         self.last_tick = Instant::now();
     }
 
-    pub fn on_key(&mut self, key: &KeyEvent) {
-        self.on_key_global(key);
-        match self.route {
-            Route::Topics => self.topics.on_key(key),
-            Route::Subscriptions => self.subscriptions.on_key(key),
-        }
+    pub async fn on_key(&mut self, key: &KeyEvent) {
+        if self.on_key_global(key).await {
+            return;
+        } else {
+            match self.route {
+                Route::Topics => self.topics.on_key(key),
+                Route::Subscriptions => self.subscriptions.on_key(key),
+            }
+        };
     }
 
     pub fn on_pubsub(&mut self, event: &GcpMsg) {
@@ -55,22 +61,28 @@ impl App {
         }
     }
 
-    fn on_key_global(&mut self, key: &KeyEvent) {
+    async fn on_key_global(&mut self, key: &KeyEvent) -> bool {
+        let mut handled = false;
         match key.code {
             KeyCode::Char('c') if key.modifiers == crossterm::event::KeyModifiers::CONTROL => {
                 // Ctrl+C to quit
-                self.tx.blocking_send(Event::Quit).unwrap();
+                self.tx.send(Event::Quit).await.unwrap();
+                handled = true;
             }
             KeyCode::Char('q') => {
-                self.tx.blocking_send(Event::Quit).unwrap();
+                self.tx.send(Event::Quit).await.unwrap();
+                handled = true;
             }
             KeyCode::Char('t') => {
                 self.route = Route::Topics;
+                handled = true;
             }
             KeyCode::Char('s') => {
                 self.route = Route::Subscriptions;
+                handled = true;
             }
             _ => {}
         }
+        handled
     }
 }
