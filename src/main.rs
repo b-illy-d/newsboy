@@ -5,7 +5,6 @@ use tokio::{sync::mpsc, time};
 mod app;
 mod event;
 mod gcp;
-mod tui;
 mod ui;
 
 use app::App;
@@ -14,7 +13,7 @@ use gcp::Pubsub;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let mut terminal = tui::init()?;
+    let mut terminal = ratatui::init();
 
     let (tx, mut rx) = mpsc::channel::<Event>(128);
 
@@ -69,18 +68,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         match rx.recv().await {
             Some(Event::Tick) => app.on_tick(),
-            Some(Event::Input(key)) => app.on_key(&key),
+            Some(Event::Input(key)) => app.on_key(&key).await,
             Some(Event::Gcp(msg)) => app.on_pubsub(&msg),
             Some(Event::Quit) => break,
             None => break,
         }
     }
 
-    match tui::restore(terminal) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("Error restoring terminal: {}", e);
-        }
-    }
+    ratatui::restore();
     Ok(())
 }
