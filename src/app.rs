@@ -37,14 +37,10 @@ impl App {
     }
 
     pub async fn on_key(&mut self, key: &KeyEvent) {
-        if self.on_key_global(key).await {
-            return;
-        } else {
-            match self.route {
-                Route::Topics => self.topics.on_key(key),
-                Route::Subscriptions => self.subscriptions.on_key(key),
-            }
-        };
+        match self.route {
+            Route::Topics => self.topics.on_key(key),
+            Route::Subscriptions => self.subscriptions.on_key(key),
+        }
     }
 
     pub fn on_pubsub(&mut self, event: &GcpMsg) {
@@ -61,28 +57,22 @@ impl App {
         }
     }
 
-    async fn on_key_global(&mut self, key: &KeyEvent) -> bool {
-        let mut handled = false;
+    async fn on_key_global(&mut self, key: &KeyEvent) {
         match key.code {
             KeyCode::Char('c') if key.modifiers == crossterm::event::KeyModifiers::CONTROL => {
                 // Ctrl+C to quit
                 self.tx.send(Event::Quit).await.unwrap();
-                handled = true;
             }
             KeyCode::Char('q') => {
                 self.tx.send(Event::Quit).await.unwrap();
-                handled = true;
             }
             KeyCode::Char('t') => {
                 self.route = Route::Topics;
-                handled = true;
             }
             KeyCode::Char('s') => {
                 self.route = Route::Subscriptions;
-                handled = true;
             }
             _ => {}
         }
-        handled
     }
 }

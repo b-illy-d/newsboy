@@ -15,10 +15,22 @@ impl Component for TopicsComponent {
     fn init(&mut self, _app: &App) {}
 
     fn on_key(&mut self, key: &KeyEvent) {
-        match key.code {
-            Char('j') => self.down(),
-            Char('k') => self.up(),
-            _ => {}
+        if self.filter.active {
+            self.on_key_filter(key);
+        } else {
+            match key.code {
+                Char('j') => self.down(),
+                Char('k') => self.up(),
+                Char('/') => {
+                    self.filter.active = true;
+                    self.filter.text.clear();
+                }
+                Esc => {
+                    self.filter.active = false;
+                    self.filter.text.clear();
+                }
+                _ => {}
+            }
         }
     }
 
@@ -31,8 +43,8 @@ impl Component for TopicsComponent {
             .collect();
 
         // title text
-        let filter_title = if self.filter_active {
-            format!(" Topics [ Search: {} ] ", self.filter_text)
+        let filter_title = if self.filter.active {
+            format!(" Topics [ Search: {} ] ", self.filter.text)
         } else {
             " Topics ".to_string()
         };
@@ -68,8 +80,7 @@ pub struct TopicsComponent {
     pub topics: Vec<TopicInfo>,
     pub visible_topics: Vec<TopicInfo>,
     pub selected: usize,
-    pub filter_active: bool,
-    pub filter_text: String,
+    filter: TextFilter,
 }
 
 impl TopicsComponent {
@@ -79,13 +90,11 @@ impl TopicsComponent {
             topics: Vec::new(),
             visible_topics: Vec::new(),
             selected: 0,
-            filter_active: false,
-            filter_text: String::new(),
+            filter: TextFilter {
+                active: false,
+                text: String::new(),
+            },
         }
-    }
-
-    pub fn set_active(&mut self, active: bool) {
-        self.is_active = active;
     }
 
     pub fn on_topics(&mut self, topics: &Vec<TopicInfo>) {
@@ -94,12 +103,16 @@ impl TopicsComponent {
     }
 
     fn filter_and_sort_topics(&mut self) {
-        if !self.filter_active || self.filter_text.is_empty() {
+        if self.topics.len() == 0 {
+            self.visible_topics = Vec::new();
+            return;
+        }
+        if !self.filter.active || self.filter.text.is_empty() {
             self.visible_topics = self.topics.clone();
             self.visible_topics.sort_by(|a, b| a.name.cmp(&b.name));
             return;
         }
-        let filter_text = self.filter_text.to_lowercase();
+        let filter_text = self.filter.text.to_lowercase();
         self.visible_topics = self
             .topics
             .iter()
@@ -131,4 +144,24 @@ impl TopicsComponent {
             self.selected -= 1;
         }
     }
+
+    fn on_key_filter(&mut self, key: &KeyEvent) {
+        match key.code {
+            Char(c) => {
+                if c.is_ascii() {
+                    self.filter.text.push(c);
+                }
+            }
+            Backspace => {
+                self.filter.text.pop();
+            }
+            _ => {}
+        }
+        self.filter_and_sort_topics();
+    }
+}
+
+struct TextFilter {
+    pub active: bool,
+    pub text: String,
 }

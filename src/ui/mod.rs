@@ -4,6 +4,8 @@ pub use components::*;
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, Borders},
     Frame,
 };
 
@@ -33,7 +35,7 @@ fn draw_left_content(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(9), // Header
+            Constraint::Length(7), // Header
             Constraint::Min(0),    // Main content
         ])
         .split(area);
@@ -51,15 +53,15 @@ fn draw_right_content(f: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
-    app.subscriptions.view(f, chunks[1], app);
-    draw_footer(f, app, chunks[0]);
+    app.subscriptions.view(f, chunks[0], app);
+    draw_footer(f, app, chunks[1]);
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let footer = format!("Ticks {}", app.ticks);
     let footer_paragraph = ratatui::widgets::Paragraph::new(footer)
-        .block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::NONE))
-        .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::Yellow));
 
     f.render_widget(footer_paragraph, area);
 }
