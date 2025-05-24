@@ -1,39 +1,28 @@
-use std::{
-    error::Error,
-    io::{stdout, Write},
-    time::Duration,
-};
-
-use crossterm::{
-    event::{DisableMouseCapture, Event as CEvent, KeyCode, poll, read},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use crossterm::event::{poll, read, Event as CEvent};
+use std::{error::Error, time::Duration};
 use tokio::{sync::mpsc, time};
 
 mod app;
 mod event;
-mod tui;
 mod gcp;
+mod tui;
+mod ui;
 
 use app::App;
 use event::Event;
-use tui::{init, restore};
-use gcp::PubSubClient;
+use gcp::Pubsub;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = tui::init()?;
 
-    // ── event bus ──────────────────────────────────────────────────────
     let (tx, mut rx) = mpsc::channel::<Event>(128);
 
     // tick producer
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            let mut ticker = time::interval(Duration::from_millis(1000));
+            let mut ticker = time::interval(Duration::from_millis(50));
             loop {
                 ticker.tick().await;
                 if tx.send(Event::Tick).await.is_err() {
@@ -57,10 +46,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // pub/sub task
     {
-        let tx = tx.clone();
+        // let tx = tx.clone();
         tokio::spawn(async move {
-            let mut client = PubSubClient::new(None).await.unwrap();
-            client.run(tx).await;
+            let mut pubsub = Pubsub::new();
+            pubsub.run();
         });
     }
 
@@ -69,21 +58,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // ── main loop ──────────────────────────────────────────────────────
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app))?;
+        terminal.draw(|f| {
+            let area = f.size();
+            ui::draw(f, area, &mut app)
+        })?;
 
         match rx.recv().await {
-            Some(Event::Tick) => app.on_tick().await,
-            Some(Event::Input(key)) => {
-                if matches!(key.code, KeyCode::Char('q')) {
-                    break;
-                }
-                app.on_key(key).await;
-            }
-            Some(Event::Gcp(msg)) => app.on_pubsub(msg).await,
+            Some(Event::Tick) => app.on_tick(),
+            Some(Event::Input(key)) => app.on_key(&key),
+            Some(Event::Gcp(msg)) => app.on_pubsub(&msg),
+            Some(Event::Quit) => break,
             None => break,
         }
     }
 
-    tui::restore(terminal)
+    match tui::restore(terminal) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error restoring terminal: {}", e);
+        }
+    }
     Ok(())
 }
