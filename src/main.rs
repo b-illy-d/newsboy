@@ -9,35 +9,37 @@ mod pubsub;
 mod view;
 
 use app::App;
-use event::{on_key, on_pubsub, on_quit, on_tick, AppEvent};
+use event::{on_event, Event};
 use view::draw;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = ratatui::init();
 
-    let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
+    let (tx, mut rx) = mpsc::channel::<Event>(128);
 
+    // Tick Loop
     {
         let tx = tx.clone();
         tokio::spawn(async move {
             let mut ticker = time::interval(Duration::from_millis(50));
             loop {
                 ticker.tick().await;
-                if tx.send(AppEvent::Tick).await.is_err() {
+                if tx.send(Event::Tick).await.is_err() {
                     break;
                 }
             }
         });
     }
 
+    // Input handling
     {
         let tx = tx.clone();
         tokio::spawn(async move {
             loop {
                 if poll(Duration::from_millis(50)).unwrap() {
                     if let CEvent::Key(k) = read().unwrap() {
-                        if tx.send(AppEvent::Input(k)).await.is_err() {
+                        if tx.send(Event::Input(k)).await.is_err() {
                             break;
                         }
                     }
@@ -46,8 +48,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         });
     }
 
-    let mut app = App::new(tx.clone());
+    let mut app = App::new();
 
+    // Event handling
     loop {
         if app.should_quit {
             break;
@@ -56,10 +59,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         terminal.draw(|f| draw(f, &mut app))?;
 
         match rx.recv().await {
-            Some(AppEvent::Tick) => on_tick(&mut app),
-            Some(AppEvent::Input(key)) => on_key(key, &mut app).await,
-            Some(AppEvent::Pubsub(msg)) => on_pubsub(msg, &mut app).await,
-            Some(AppEvent::Quit) => on_quit(&mut app),
+            Some(e) => match on_event(&mut app, e).await {
+                Some(e) => {
+                    if tx.send(e).await.is_err() {
+                        break;
+                    }
+                }
+                None => {}
+            },
             None => {}
         }
     }

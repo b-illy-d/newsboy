@@ -1,33 +1,32 @@
 use crate::component::topics::TopicsState;
-use crate::event::AppEvent;
-use crate::pubsub::PubsubClient;
+use crate::pubsub::Pubsub;
 use std::time::Instant;
-use tokio::sync::mpsc::Sender;
 
-pub enum Route {
-    Topics,
+pub enum Focus {
+    Global,
+    SettingProjectId,
 }
 
 pub struct App {
-    pub route: Route,
-    pub ticks: u64,
+    pub focus: Focus,
     pub last_tick: Instant,
+    pub project_id: Option<String>,
+    pub pubsub: Pubsub,
     pub should_quit: bool,
+    pub ticks: u64,
     pub topics: TopicsState,
-    pub pubsub: Option<PubsubClient>,
-    pub sender: Sender<AppEvent>,
 }
 
 impl App {
-    pub fn new(tx: Sender<AppEvent>) -> Self {
+    pub fn new() -> Self {
         Self {
-            route: Route::Topics,
-            ticks: 0,
+            focus: Focus::Global,
             last_tick: Instant::now(),
+            project_id: None,
+            pubsub: Pubsub::default(),
             should_quit: false,
+            ticks: 0,
             topics: TopicsState::new(),
-            pubsub: None,
-            sender: tx,
         }
     }
 }

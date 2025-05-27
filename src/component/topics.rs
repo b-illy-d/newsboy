@@ -41,7 +41,7 @@ impl TopicsState {
 //     }
 // }
 
-pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
+pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
@@ -50,15 +50,12 @@ pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
             Constraint::Percentage(70), // Right panel
         ])
         .split(area);
-    draw_left_content(f, app, chunks[0]);
+    draw_left_content(f, chunks[0], app);
 }
 
-fn draw_left_content(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+fn draw_left_content(f: &mut ratatui::Frame, area: Rect, app: &App) {
     let list = List::new(app.topics.visibile.iter().map(|topic| topic.name.clone()))
-        .block(Block::bordered().title("Topics"))
-        .highlight_style(Style::new().green().italic())
-        .highlight_symbol(">>")
-        .repeat_highlight_symbol(true);
+        .block(Block::bordered().title("Topics"));
 
-    f.render_stateful_widget(list, area, &mut app.topics.list_state);
+    f.render_widget(list, area);
 }
