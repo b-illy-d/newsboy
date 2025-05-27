@@ -1,34 +1,38 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Style},
     widgets::{Block, Borders},
     Frame,
 };
 
 use crate::{
-    app::App,
-    component::{header, setting_project_id, topics},
+    app::{App, Route},
+    component::{header, setup, topics},
 };
 
 pub fn draw(state: &App, f: &mut Frame) {
     let area = f.area();
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(8),
-            Constraint::Min(0),
-            Constraint::Length(3),
-        ])
-        .split(area);
-    header::draw(state, f, chunks[0]);
-    draw_main(state, f, chunks[1]);
-    draw_footer(state, f, chunks[2]);
-    setting_project_id::draw(&state.pubsub.setting_project_id, f);
+    let [header_area, main_area, footer_area] = Layout::vertical([
+        Constraint::Length(6),
+        Constraint::Min(0),
+        Constraint::Length(3),
+    ])
+    .margin(1)
+    .areas(area);
+    header::draw(state, f, header_area);
+    draw_main(state, f, main_area);
+    draw_footer(state, f, footer_area);
 }
 
 fn draw_main(state: &App, f: &mut Frame, area: Rect) {
-    topics::draw(state, f, area);
+    match state.route {
+        Route::Setup => {
+            setup::draw(state, f, area);
+        }
+        Route::Topics => {
+            topics::draw(state, f, area);
+        }
+    }
 }
 fn draw_footer(state: &App, f: &mut Frame, area: Rect) {
     let footer = format!("Ticks {}", state.ticks);

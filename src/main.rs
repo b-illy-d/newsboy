@@ -1,4 +1,4 @@
-use crossterm::event::{poll, read, Event as CEvent};
+use ratatui::crossterm::event::{poll, read, Event as CEvent};
 use std::{error::Error, time::Duration};
 use tokio::{sync::mpsc, time};
 
@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut app = App::new();
+    app.init();
 
     // Event handling
     loop {

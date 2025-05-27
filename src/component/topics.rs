@@ -42,7 +42,6 @@ impl TopicsState {
 pub fn draw(state: &App, f: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .margin(1)
         .constraints([
             Constraint::Percentage(30), // Left panel
             Constraint::Percentage(70), // Right panel

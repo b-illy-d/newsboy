@@ -1,29 +1,17 @@
 use crate::app::{App, Focus};
-use crate::component::{
-    pubsub::{self, ProjectIdEvent, PubsubEvent},
-    setting_project_id,
-};
-use crossterm::event::{KeyCode::Char, KeyEvent};
+use crate::component::reusable::text_field;
+use crate::component::{pubsub, reusable::text_field::TextFieldEvent};
+use ratatui::crossterm::event::{KeyCode::Char, KeyEvent, KeyModifiers};
 
 pub enum AppEvent {
     Tick,
     Input(KeyEvent),
     Pubsub(pubsub::PubsubEvent),
+    TextField(TextFieldEvent),
     Quit,
 }
 
 // Event Factories
-pub fn start_setting_project_id() -> AppEvent {
-    AppEvent::Pubsub(PubsubEvent::ProjectId(ProjectIdEvent::StartSetting))
-}
-pub fn input_project_id(input: String) -> AppEvent {
-    AppEvent::Pubsub(PubsubEvent::ProjectId(ProjectIdEvent::Input(input)))
-}
-pub fn finish_setting_project_id(project_id: Option<String>) -> AppEvent {
-    AppEvent::Pubsub(PubsubEvent::ProjectId(ProjectIdEvent::FinishSetting(
-        project_id,
-    )))
-}
 pub fn quit() -> AppEvent {
     AppEvent::Quit
 }
@@ -34,6 +22,10 @@ pub async fn on_event(app: &mut App, e: AppEvent) -> Option<AppEvent> {
         AppEvent::Tick => on_tick(app),
         AppEvent::Input(key) => on_key(app, key).await,
         AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut app.pubsub, pubsub_event).await,
+        AppEvent::TextField(event) => {
+            let field = app.text_fields.get_mut(&event.id);
+            text_field::on_event(field, event)
+        }
         AppEvent::Quit => on_quit(app),
     }
 }
@@ -55,6 +47,18 @@ pub enum InputHandled {
     NotHandled,
 }
 
+pub fn handled(event: AppEvent) -> InputHandled {
+    InputHandled::Handled(Some(event))
+}
+
+pub fn handled_empty() -> InputHandled {
+    InputHandled::Handled(None)
+}
+
+pub fn not_handled() -> InputHandled {
+    InputHandled::NotHandled
+}
+
 impl InputHandled {
     pub fn is_handled(&self) -> bool {
         matches!(self, InputHandled::Handled(_))
@@ -71,8 +75,12 @@ impl InputHandled {
 pub async fn on_key(app: &App, key: KeyEvent) -> Option<AppEvent> {
     let focused_result = match app.focus {
         Focus::Global => global_on_key(key).await,
-        Focus::SettingProjectId => {
-            setting_project_id::on_key(&app.pubsub.setting_project_id, key).await
+        Focus::TextField(ref id) => {
+            let field = app
+                .text_fields
+                .get(id)
+                .expect("TextFieldEvent should have a valid id");
+            text_field::on_key(field, key)
         }
     };
 
@@ -90,7 +98,7 @@ pub async fn on_key(app: &App, key: KeyEvent) -> Option<AppEvent> {
 
 async fn global_on_key(key: KeyEvent) -> InputHandled {
     let event = match key.code {
-        Char('p') => Some(start_setting_project_id()),
+        Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(quit()),
         Char('q') => Some(quit()),
         _ => None,
     };

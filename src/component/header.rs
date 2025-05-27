@@ -1,11 +1,13 @@
-use crate::app::App;
+use crate::app::{App, Route};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{block::Title, Block, Borders, Paragraph, Tabs},
     Frame,
 };
+use strum::IntoEnumIterator;
+
+use super::reusable::text_field::draw_simple_text_field;
 
 const LOGO: &str = r#"
                        ▗▖   
@@ -13,46 +15,52 @@ const LOGO: &str = r#"
  █   █ ▐▛▀▀▘█ ▄ █ ▀▄▄  ▐▛▀▚▖█   █ █   █
  █   █ ▝▚▄▄▖█▄█▄█ ▄▄▄▀ ▐▙▄▞▘▀▄▄▄▀  ▀▀▀█
  ================================ ▄   █
-                                   ▀▀▀ 
-"#;
+                                   ▀▀▀ "#;
+
+fn trimmed_logo() -> String {
+    let lines: Vec<&str> = LOGO.lines().collect();
+    lines[1..lines.len()].join("\n")
+}
 
 pub fn draw(state: &App, f: &mut Frame, area: Rect) {
-    let chunks = Layout::default()
+    use Constraint::Percentage;
+
+    let [logo_area, tabs_area] = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(30), // Left panel
-            Constraint::Percentage(70), // Right panel
+            Percentage(30), // Left panel
+            Percentage(70), // Right panel
         ])
-        .split(area);
-    draw_logo(f, chunks[0]);
-    draw_summary(state, f, chunks[1]);
+        .areas(area);
+    draw_logo(f, logo_area);
+    draw_tabs(state, f, tabs_area);
 }
 
 fn draw_logo(f: &mut Frame, area: Rect) {
-    let logo_paragraph = Paragraph::new(LOGO)
+    let logo_paragraph = Paragraph::new(trimmed_logo())
         .block(Block::default().borders(Borders::NONE))
-        .style(Style::default().fg(Color::LightBlue));
+        .style(Style::default().fg(Color::Cyan));
 
     f.render_widget(logo_paragraph, area);
 }
 
-fn draw_summary(state: &App, f: &mut Frame, area: Rect) {
-    let project_id_str = match &state.project_id {
-        Some(id) if !id.is_empty() => id.clone(),
-        _ => "Press 'P' to set project".to_string(),
-    };
-    let summary_lines: Vec<Line> = vec![
-        format!(" - Project ID: {}", project_id_str),
-        format!(" - Total Topics: {}", state.topics.all.len()),
-        format!(" - Visible Topics: {}", state.topics.visibile.len()),
-    ]
-    .into_iter()
-    .map(|s| Line::from(Span::raw(s)))
-    .collect();
+fn draw_tabs(state: &App, f: &mut Frame, area: Rect) {
+    use Constraint::{Length, Min};
+    let [_, tabs_area] = Layout::vertical([Min(0), Length(3)]).areas(area);
 
-    let summary_paragraph = Paragraph::new(summary_lines)
-        .block(Block::default().borders(Borders::ALL).yellow())
-        .style(Style::default().yellow());
-
-    f.render_widget(summary_paragraph, area);
+    let titles = Route::iter().map(Route::title);
+    let highlight_style = (Color::default(), Color::LightBlue);
+    let selected_tab_index = state.route as usize;
+    let tabs = Tabs::new(titles)
+        .highlight_style(highlight_style)
+        .select(selected_tab_index)
+        .divider("|")
+        .block(
+            Block::default()
+                .light_blue()
+                .borders(Borders::ALL)
+                .title(Title::from("Navigation"))
+                .title_alignment(Alignment::Center),
+        );
+    f.render_widget(tabs, tabs_area);
 }
