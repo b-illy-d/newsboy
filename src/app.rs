@@ -3,6 +3,7 @@ use crate::component::{
 };
 use ratatui::{style::Stylize, text::Line};
 use std::time::Instant;
+use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
 
 pub enum Focus {
@@ -20,8 +21,11 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn title(self) -> Line<'static> {
-        Line::from(format!("  {self}  ")).light_blue()
+    pub fn titles() -> Vec<Line<'static>> {
+        Route::iter()
+            .enumerate()
+            .map(|(i, r)| Line::from(format!("[{}] {}", i + 1, r)).light_blue())
+            .collect()
     }
 }
 

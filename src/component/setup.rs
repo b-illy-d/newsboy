@@ -70,9 +70,9 @@ fn on_set_project_id(state: &mut Setup, id: String) -> Option<AppEvent> {
     None
 }
 
-// ================
-// ==== EVENTS ====
-// ================
+// ==============
+// ==== VIEW ====
+// ==============
 
 pub fn draw(state: &App, f: &mut Frame, area: Rect) {
     let block = ratatui::widgets::Block::default()

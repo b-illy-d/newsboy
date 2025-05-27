@@ -48,7 +48,7 @@ fn draw_tabs(state: &App, f: &mut Frame, area: Rect) {
     use Constraint::{Length, Min};
     let [_, tabs_area] = Layout::vertical([Min(0), Length(3)]).areas(area);
 
-    let titles = Route::iter().map(Route::title);
+    let titles = Route::titles();
     let highlight_style = (Color::default(), Color::LightBlue);
     let selected_tab_index = state.route as usize;
     let tabs = Tabs::new(titles)
