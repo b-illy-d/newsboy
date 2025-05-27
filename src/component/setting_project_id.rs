@@ -18,7 +18,7 @@ pub struct SettingProjectId {
     pub input: String,
 }
 
-pub fn draw(state: &mut SettingProjectId, f: &mut Frame) {
+pub fn draw(state: &SettingProjectId, f: &mut Frame) {
     if !state.active {
         return;
     }

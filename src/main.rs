@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        terminal.draw(|f| draw(f, &mut app))?;
+        terminal.draw(|f| draw(&app, f))?;
 
         match rx.recv().await {
             Some(e) => match on_event(&mut app, e).await {

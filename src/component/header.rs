@@ -16,7 +16,7 @@ const LOGO: &str = r#"
                                    ▀▀▀ 
 "#;
 
-pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
+pub fn draw(state: &App, f: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -25,7 +25,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         ])
         .split(area);
     draw_logo(f, chunks[0]);
-    draw_summary(f, app, chunks[1]);
+    draw_summary(state, f, chunks[1]);
 }
 
 fn draw_logo(f: &mut Frame, area: Rect) {
@@ -36,15 +36,15 @@ fn draw_logo(f: &mut Frame, area: Rect) {
     f.render_widget(logo_paragraph, area);
 }
 
-fn draw_summary(f: &mut Frame, app: &mut App, area: Rect) {
-    let project_id_str = match &app.project_id {
+fn draw_summary(state: &App, f: &mut Frame, area: Rect) {
+    let project_id_str = match &state.project_id {
         Some(id) if !id.is_empty() => id.clone(),
         _ => "Press 'P' to set project".to_string(),
     };
     let summary_lines: Vec<Line> = vec![
         format!(" - Project ID: {}", project_id_str),
-        format!(" - Total Topics: {}", app.topics.all.len()),
-        format!(" - Visible Topics: {}", app.topics.visibile.len()),
+        format!(" - Total Topics: {}", state.topics.all.len()),
+        format!(" - Visible Topics: {}", state.topics.visibile.len()),
     ]
     .into_iter()
     .map(|s| Line::from(Span::raw(s)))

@@ -41,7 +41,7 @@ impl TopicsState {
 //     }
 // }
 
-pub fn draw(f: &mut Frame, area: Rect, app: &App) {
+pub fn draw(state: &App, f: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
@@ -50,7 +50,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             Constraint::Percentage(70), // Right panel
         ])
         .split(area);
-    draw_left_content(f, chunks[0], app);
+    draw_left_content(f, chunks[0], state);
 }
 
 fn draw_left_content(f: &mut ratatui::Frame, area: Rect, app: &App) {

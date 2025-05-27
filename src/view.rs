@@ -6,11 +6,11 @@ use ratatui::{
 };
 
 use crate::{
-    app::{App, Route},
+    app::App,
     component::{header, setting_project_id, topics},
 };
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(state: &App, f: &mut Frame) {
     let area = f.area();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -21,21 +21,17 @@ pub fn draw(f: &mut Frame, app: &App) {
             Constraint::Length(3),
         ])
         .split(area);
-    header::draw(f, chunks[0], app);
-    draw_main(f, chunks[1], app);
-    draw_footer(f, chunks[2], app);
-    setting_project_id::draw(f, app);
+    header::draw(state, f, chunks[0]);
+    draw_main(state, f, chunks[1]);
+    draw_footer(state, f, chunks[2]);
+    setting_project_id::draw(&state.pubsub.setting_project_id, f);
 }
 
-fn draw_main(f: &mut Frame, area: Rect, app: &App) {
-    match app.route {
-        Route::Topics => {
-            topics::draw(f, area, app);
-        }
-    }
+fn draw_main(state: &App, f: &mut Frame, area: Rect) {
+    topics::draw(state, f, area);
 }
-fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
-    let footer = format!("Ticks {}", app.ticks);
+fn draw_footer(state: &App, f: &mut Frame, area: Rect) {
+    let footer = format!("Ticks {}", state.ticks);
     let footer_paragraph = ratatui::widgets::Paragraph::new(footer)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::Yellow));

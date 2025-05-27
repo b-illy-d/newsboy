@@ -1,4 +1,5 @@
 use crate::component::{setting_project_id::SettingProjectId, topics::TopicInfo};
+use crate::event::Event;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 
 #[derive(Default)]
@@ -50,25 +51,26 @@ impl Pubsub {
     }
 }
 
-pub async fn on_event(state: &mut Pubsub, event: PubsubEvent) {
+pub async fn on_event(state: &mut Pubsub, event: PubsubEvent) -> Option<Event> {
     match event {
-        PubsubEvent::ProjectId(e) => {
-            on_project_id_event(state, e).await;
-        }
+        PubsubEvent::ProjectId(e) => on_project_id_event(state, e).await,
         PubsubEvent::Topics(topics) => {
             state.topics = topics;
+            None
         }
     }
 }
 
-async fn on_project_id_event(state: &mut Pubsub, event: ProjectIdEvent) {
+async fn on_project_id_event(state: &mut Pubsub, event: ProjectIdEvent) -> Option<Event> {
     match event {
         ProjectIdEvent::StartSetting => {
             state.setting_project_id.active = true;
-            state.pubsub.setting_project_id.input.clear();
+            state.setting_project_id.input.clear();
+            None
         }
         ProjectIdEvent::Input(input) => {
             state.setting_project_id.input = input;
+            None
         }
         ProjectIdEvent::FinishSetting(project_id) => {
             state.setting_project_id.input.clear();
@@ -76,12 +78,15 @@ async fn on_project_id_event(state: &mut Pubsub, event: ProjectIdEvent) {
             match project_id {
                 Some(ref id) if id.is_empty() => {
                     state.project_id = None;
+                    None
                 }
                 Some(ref id) => {
                     state.project_id = Some(id.clone());
+                    None
                 }
                 None => {
                     state.project_id = None;
+                    None
                 }
             }
         }
