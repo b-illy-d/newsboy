@@ -1,4 +1,3 @@
-use crate::app::App;
 use crate::event::{finish_setting_project_id, input_project_id, InputHandled};
 use crossterm::event::{
     KeyCode::{Char, Enter, Esc},

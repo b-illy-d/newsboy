@@ -1,5 +1,7 @@
-use crate::component::{setting_project_id::SettingProjectId, topics::TopicInfo};
-use crate::event::Event;
+use crate::{
+    component::{setting_project_id::SettingProjectId, topics::TopicInfo},
+    event::AppEvent,
+};
 use google_cloud_pubsub::client::{Client, ClientConfig};
 
 #[derive(Default)]
@@ -51,8 +53,8 @@ impl Pubsub {
     }
 }
 
-pub async fn on_event(state: &mut Pubsub, event: PubsubEvent) -> Option<Event> {
-    match event {
+pub async fn on_event(state: &mut Pubsub, e: PubsubEvent) -> Option<AppEvent> {
+    match e {
         PubsubEvent::ProjectId(e) => on_project_id_event(state, e).await,
         PubsubEvent::Topics(topics) => {
             state.topics = topics;
@@ -61,8 +63,8 @@ pub async fn on_event(state: &mut Pubsub, event: PubsubEvent) -> Option<Event> {
     }
 }
 
-async fn on_project_id_event(state: &mut Pubsub, event: ProjectIdEvent) -> Option<Event> {
-    match event {
+async fn on_project_id_event(state: &mut Pubsub, e: ProjectIdEvent) -> Option<AppEvent> {
+    match e {
         ProjectIdEvent::StartSetting => {
             state.setting_project_id.active = true;
             state.setting_project_id.input.clear();

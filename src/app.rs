@@ -1,5 +1,4 @@
-use crate::component::topics::TopicsState;
-use crate::pubsub::Pubsub;
+use crate::component::{pubsub::Pubsub, topics::TopicsState};
 use std::time::Instant;
 
 pub enum Focus {

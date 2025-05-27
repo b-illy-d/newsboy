@@ -5,18 +5,17 @@ use tokio::{sync::mpsc, time};
 mod app;
 mod component;
 mod event;
-mod pubsub;
 mod view;
 
 use app::App;
-use event::{on_event, Event};
+use event::{on_event, AppEvent};
 use view::draw;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = ratatui::init();
 
-    let (tx, mut rx) = mpsc::channel::<Event>(128);
+    let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
 
     // Tick Loop
     {
@@ -25,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let mut ticker = time::interval(Duration::from_millis(50));
             loop {
                 ticker.tick().await;
-                if tx.send(Event::Tick).await.is_err() {
+                if tx.send(AppEvent::Tick).await.is_err() {
                     break;
                 }
             }
@@ -39,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             loop {
                 if poll(Duration::from_millis(50)).unwrap() {
                     if let CEvent::Key(k) = read().unwrap() {
-                        if tx.send(Event::Input(k)).await.is_err() {
+                        if tx.send(AppEvent::Input(k)).await.is_err() {
                             break;
                         }
                     }
