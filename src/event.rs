@@ -4,7 +4,7 @@ use crate::component::{
     debug::{self, toggle_debug_logs, DebugLogsEvent},
     pubsub,
     reusable::text_field::{self, TextFieldEvent},
-    setup::SetupEvent,
+    setup::{self, SetupEvent},
 };
 use ratatui::crossterm::event::{
     KeyCode::{BackTab, Char, Tab},
@@ -68,6 +68,10 @@ pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
         }
         AppEvent::Debug(event) => {
             debug::on_event(&mut state.debug_logs, event);
+            None
+        }
+        AppEvent::Setup(event) => {
+            setup::on_event(&mut state.setup, event);
             None
         }
         AppEvent::Quit => on_quit(state),

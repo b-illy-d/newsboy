@@ -13,8 +13,8 @@ use std::borrow::Cow;
 
 use crate::{
     app::App,
-    component::reusable::text_field::draw_simple_text_field,
-    event::{handled, AppEvent, InputHandled},
+    component::reusable::text_field::{draw_simple_text_field, TextFieldEvent, TextFieldEventType},
+    event::{handled, not_handled, AppEvent, InputHandled},
 };
 
 // ===============
@@ -80,7 +80,12 @@ impl Setup {
 
 pub enum SetupEvent {
     ChangeSetupValue(String, String),
+    EditSetupValue(String),
     FocusSetup(String),
+}
+
+fn edit_value(name: &str) -> SetupEvent {
+    SetupEvent::EditSetupValue(name.to_string())
 }
 
 fn set_value(name: &str, value: &str) -> SetupEvent {
@@ -102,6 +107,7 @@ pub fn on_event(state: &mut Setup, e: SetupEvent) -> Option<AppEvent> {
             state.focused = name;
             None
         }
+        _ => None,
     }
 }
 
@@ -130,23 +136,18 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
             handled(focus_setup(fields[next_index].0).into())
         }
         Down => {
-            let fields = Setup::get_fields_info();
-            let current_index = fields
-                .iter()
-                .position(|(n, _)| n == &state.focused)
-                .unwrap_or(0);
             let next_index = (current_index + 1) % fields.len();
-            focus_setup(fields[next_index].0)
+            handled(focus_setup(fields[next_index].0).into())
         }
-        Char(c) if c.is_ascii_alphanumeric() || c == '_' || c == '-' => set_value(
-            &state.focused,
-            &format!("{}{}", state.get(&state.focused), c),
-        ),
-        Enter => {
-            // Handle Enter key if needed
-            None
+        Char(' ') => {
+            let current_field = fields[current_index].0;
+            let event = TextFieldEvent {
+                id: current_field.to_string(),
+                event_type: TextFieldEventType::StartEditing,
+            };
+            handled(event.into())
         }
-        _ => None,
+        _ => not_handled(),
     }
 }
 

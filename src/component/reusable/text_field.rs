@@ -92,7 +92,7 @@ impl TextField {
 // ================
 
 #[derive(Clone)]
-pub enum EventType {
+pub enum TextFieldEventType {
     StartEditing,
     DoneEditing(bool),
     InputChar(String),
@@ -104,37 +104,37 @@ pub enum EventType {
 #[derive(Clone)]
 pub struct TextFieldEvent {
     pub id: String,
-    pub event_type: EventType,
+    pub event_type: TextFieldEventType,
 }
 
 impl TextFieldEvent {
-    pub fn new(id: String, event_type: EventType) -> Self {
+    pub fn new(id: String, event_type: TextFieldEventType) -> Self {
         TextFieldEvent { id, event_type }
     }
 }
 
 fn start_editing(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::StartEditing)
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::StartEditing)
 }
 
 fn done_editing(id: &str, submit: bool) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::DoneEditing(submit))
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::DoneEditing(submit))
 }
 
 fn enter_char(id: &str, c: char) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::InputChar(c.to_string()))
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::InputChar(c.to_string()))
 }
 
 fn delete_char(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::DeleteChar)
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::DeleteChar)
 }
 
 fn move_cursor_left(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::MoveCursorLeft)
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::MoveCursorLeft)
 }
 
 fn move_cursor_right(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), EventType::MoveCursorRight)
+    TextFieldEvent::new(id.to_string(), TextFieldEventType::MoveCursorRight)
 }
 
 // ==================
@@ -143,12 +143,12 @@ fn move_cursor_right(id: &str) -> TextFieldEvent {
 
 pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<AppEvent> {
     match e.event_type {
-        EventType::StartEditing => on_start_editing(state),
-        EventType::DoneEditing(submit) => on_done_editing(state, submit),
-        EventType::InputChar(c) => on_enter_char(state, c.chars().next().unwrap()),
-        EventType::DeleteChar => on_delete_char(state),
-        EventType::MoveCursorLeft => on_move_cursor_left(state),
-        EventType::MoveCursorRight => on_move_cursor_right(state),
+        TextFieldEventType::StartEditing => on_start_editing(state),
+        TextFieldEventType::DoneEditing(submit) => on_done_editing(state, submit),
+        TextFieldEventType::InputChar(c) => on_enter_char(state, c.chars().next().unwrap()),
+        TextFieldEventType::DeleteChar => on_delete_char(state),
+        TextFieldEventType::MoveCursorLeft => on_move_cursor_left(state),
+        TextFieldEventType::MoveCursorRight => on_move_cursor_right(state),
     }
 }
 
