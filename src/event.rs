@@ -1,7 +1,13 @@
 use crate::app::{App, Focus, Route};
-use crate::component::reusable::text_field;
-use crate::component::{pubsub, reusable::text_field::TextFieldEvent};
-use ratatui::crossterm::event::{KeyCode::Char, KeyEvent, KeyModifiers};
+use crate::component::{
+    debug::{self, toggle_debug_logs},
+    pubsub,
+    reusable::text_field::{self, TextFieldEvent},
+};
+use ratatui::crossterm::event::{
+    KeyCode::{Char, Tab},
+    KeyEvent, KeyModifiers,
+};
 use strum::IntoEnumIterator;
 
 // ================
@@ -14,6 +20,9 @@ pub enum AppEvent {
     Pubsub(pubsub::PubsubEvent),
     TextField(TextFieldEvent),
     SelectRoute(Route),
+    NextRoute,
+    PrevRoute,
+    Debug(DebugLogsEvent),
     Quit,
 }
 
@@ -25,20 +34,32 @@ pub fn quit() -> AppEvent {
 // ==== HANDLERS ====
 // ==================
 
-pub async fn on_event(app: &mut App, e: AppEvent) -> Option<AppEvent> {
+pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
     match e {
-        AppEvent::Tick => on_tick(app),
-        AppEvent::Input(key) => on_key(app, key).await,
-        AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut app.pubsub, pubsub_event).await,
+        AppEvent::Tick => on_tick(state),
+        AppEvent::Input(key) => on_key(state, key).await,
+        AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut state.pubsub, pubsub_event).await,
         AppEvent::TextField(event) => {
-            let field = app.text_fields.get_mut(&event.id);
+            let field = state.text_fields.get_mut(&event.id);
             text_field::on_event(field, event)
         }
         AppEvent::SelectRoute(route) => {
-            app.route = route;
+            state.route = route;
             None
         }
-        AppEvent::Quit => on_quit(app),
+        AppEvent::NextRoute => {
+            state.route = state.route.next();
+            None
+        }
+        AppEvent::PrevRoute => {
+            state.route = state.route.previous();
+            None
+        }
+        AppEvent::Debug(event) => {
+            debug::on_event(state.debug_logs, event);
+            None
+        }
+        AppEvent::Quit => on_quit(state),
     }
 }
 
@@ -57,18 +78,18 @@ pub fn on_quit(app: &mut App) -> Option<AppEvent> {
 // ==== HANDLE INPUT ====
 // ======================
 
-pub async fn on_key(app: &App, key: KeyEvent) -> Option<AppEvent> {
+pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
     // Should always work, no matter where focus is
-    if key.code == Char('c') {
+    if key.code == Char('c') || key.code == Char('d') {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return Some(quit());
         }
     }
 
-    let focused_result = match app.focus {
+    let focused_result = match state.focus {
         Focus::Global => global_on_key(key).await,
         Focus::TextField(ref id) => {
-            let field = app
+            let field = state
                 .text_fields
                 .get(id)
                 .expect("TextFieldEvent should have a valid id");
@@ -78,7 +99,7 @@ pub async fn on_key(app: &App, key: KeyEvent) -> Option<AppEvent> {
 
     match focused_result.is_handled() {
         true => focused_result.into_event(),
-        false => match app.focus {
+        false => match state.focus {
             Focus::Global => None,
             _ => {
                 // If not handled by focused component, we can still handle it globally
@@ -90,19 +111,30 @@ pub async fn on_key(app: &App, key: KeyEvent) -> Option<AppEvent> {
 
 async fn global_on_key(key: KeyEvent) -> InputHandled {
     match key.code {
-        Char(c @ '0'..='9') => on_navigation_key(c),
+        Tab => on_tab_key(key),
+        Char(c @ '0'..='9') => on_numeral_key(c),
+        Char(':') => toggle_debug_logs(),
         Char('q') => handled(quit()),
         _ => not_handled(),
     }
 }
 
-fn on_navigation_key(c: char) -> InputHandled {
+fn on_numeral_key(c: char) -> InputHandled {
     if let Some(digit) = c.to_digit(10) {
         if let Some(route) = Route::iter().nth((digit - 1) as usize) {
             return handled(AppEvent::SelectRoute(route));
         }
     }
     not_handled()
+}
+
+fn on_tab_key(key: KeyEvent) -> InputHandled {
+    if key.modifiers.contains(KeyModifiers::SHIFT) {
+        println!("Prev route triggered");
+        handled(AppEvent::PrevRoute)
+    } else {
+        handled(AppEvent::NextRoute)
+    }
 }
 
 // =====================

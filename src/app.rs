@@ -1,5 +1,9 @@
 use crate::component::{
-    pubsub::PubsubState, reusable::text_field::TextFields, setup::Setup, topics::TopicsState,
+    debug::{debug_log, DebugLogs},
+    pubsub::PubsubState,
+    reusable::text_field::TextFields,
+    setup::Setup,
+    topics::TopicsState,
 };
 use ratatui::{style::Stylize, text::Line};
 use std::time::Instant;
@@ -11,7 +15,7 @@ pub enum Focus {
     TextField(String),
 }
 
-#[derive(Default, Clone, Copy, Display, FromRepr, EnumIter)]
+#[derive(Debug, Default, Clone, Copy, Display, FromRepr, EnumIter)]
 pub enum Route {
     #[default]
     #[strum(serialize = "Setup")]
@@ -27,6 +31,19 @@ impl Route {
             .map(|(i, r)| Line::from(format!("[{}] {}", i + 1, r)).light_blue())
             .collect()
     }
+
+    pub fn next(self) -> Self {
+        let index = (self as usize + 1) % Self::iter().len();
+        Self::from_repr(index).unwrap()
+    }
+
+    pub fn previous(self) -> Self {
+        let count = Self::iter().len();
+        let index = (self as usize + count - 1) % count;
+        let prev = Self::from_repr(index).unwrap();
+        debug_log(format!("Previous route: {:?}", prev));
+        prev
+    }
 }
 
 pub struct App {
@@ -39,6 +56,7 @@ pub struct App {
     pub topics: TopicsState,
     pub text_fields: TextFields,
     pub setup: Setup,
+    pub debug_logs: DebugLogs,
 }
 
 impl App {
@@ -53,13 +71,15 @@ impl App {
             topics: TopicsState::new(),
             text_fields: TextFields::new(),
             setup: Setup::default(),
+            debug_logs: DebugLogs::default(),
         }
     }
 
     pub fn init(&mut self) {
         let fields = Setup::get_fields_info();
         for (name, label) in fields {
-            self.text_fields.add(name, label);
+            self.text_fields
+                .add(name, label, Some(self.setup.get(name).to_string()));
         }
     }
 }

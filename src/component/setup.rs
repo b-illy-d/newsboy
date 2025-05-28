@@ -1,6 +1,15 @@
+use crossterm::event::{
+    KeyCode::{Char, Down, Enter, Up},
+    KeyEvent,
+};
 use ratatui::{layout::Rect, style::Stylize, text::Text, widgets::Paragraph, Frame};
+use std::borrow::Cow;
 
-use crate::{app::App, component::reusable::text_field::draw_simple_text_field, event::AppEvent};
+use crate::{
+    app::App,
+    component::reusable::text_field::draw_simple_text_field,
+    event::{AppEvent, InputHandled},
+};
 
 // ===============
 // ==== STATE ====
@@ -16,21 +25,29 @@ const FIELDS: &[(&str, &str)] = &[
 pub struct Setup {
     project_id: String,
     host: String,
-    port: u8,
+    port: u16,
+    pub focused: String,
 }
 
 impl Setup {
+    pub fn default() -> Self {
+        Setup {
+            project_id: String::new(),
+            host: "http://localhost".to_string(),
+            port: 8085,
+            focused: "project_id".to_string(),
+        }
+    }
+
     pub fn get_fields_info() -> &'static [(&'static str, &'static str)] {
         FIELDS
     }
 
-    pub fn init(&self, app: &mut App) {
-        app.text_fields.add("project_id", "Project ID");
-    }
-
-    pub fn get(&self, name: &str) -> &String {
+    pub fn get(&self, name: &str) -> Cow<'_, str> {
         match name {
-            "project_id" => &self.project_id,
+            "project_id" => Cow::Borrowed(&self.project_id),
+            "host" => Cow::Borrowed(&self.host),
+            "port" => Cow::Owned(self.port.to_string()),
             _ => panic!("Unknown setting: {}", name),
         }
     }
@@ -38,6 +55,14 @@ impl Setup {
     pub fn set(&mut self, name: &str, value: String) {
         match name {
             "project_id" => self.project_id = value,
+            "host" => self.host = value,
+            "port" => {
+                if let Ok(port) = value.parse::<u16>() {
+                    self.port = port;
+                } else {
+                    panic!("Invalid port value: {}", value);
+                }
+            }
             _ => panic!("Unknown setting: {}", name),
         }
     }
@@ -48,11 +73,16 @@ impl Setup {
 // ================
 
 pub enum SetupEvent {
-    ProjectId(String),
+    ChangeSetupValue(String, String),
+    FocusSetup(String),
 }
 
-fn set_project_id(id: &str) -> SetupEvent {
-    SetupEvent::ProjectId(id.to_string())
+fn set_value(name: &str, value: &str) -> SetupEvent {
+    SetupEvent::ChangeSetupValue(name.to_string(), value.to_string())
+}
+
+fn focus_setup(name: &str) -> SetupEvent {
+    SetupEvent::FocusSetup(name.to_string())
 }
 
 // ==================
@@ -61,14 +91,22 @@ fn set_project_id(id: &str) -> SetupEvent {
 
 pub fn on_event(state: &mut Setup, e: SetupEvent) -> Option<AppEvent> {
     match e {
-        SetupEvent::ProjectId(id) => on_set_project_id(state, id),
+        SetupEvent::ChangeSetupValue(name, value) => on_change_value(state, name, value),
+        SetupEvent::FocusSetup(name) => {
+            state.focused = name;
+            None
+        }
     }
 }
 
-fn on_set_project_id(state: &mut Setup, id: String) -> Option<AppEvent> {
-    state.set("project_id", id.to_string());
+fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<AppEvent> {
+    state.set(&name, value);
     None
 }
+
+// ===============
+// ==== INPUT ====
+// ===============
 
 // ==============
 // ==== VIEW ====

@@ -9,6 +9,10 @@ use strum::IntoEnumIterator;
 
 use super::reusable::text_field::draw_simple_text_field;
 
+// ==============
+// ==== VIEW ====
+// ==============
+
 const LOGO: &str = r#"
                        ▗▖   
  ▄▄▄▄  ▗▞▀▚▖▄   ▄  ▄▄▄ ▐▌    ▄▄▄  ▄   ▄
@@ -59,7 +63,7 @@ fn draw_tabs(state: &App, f: &mut Frame, area: Rect) {
             Block::default()
                 .light_blue()
                 .borders(Borders::ALL)
-                .title(Title::from("Navigation"))
+                .title(Title::from("Press TAB or number keys to navigate"))
                 .title_alignment(Alignment::Center),
         );
     f.render_widget(tabs, tabs_area);
