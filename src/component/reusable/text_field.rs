@@ -111,10 +111,6 @@ impl TextFieldEvent {
     pub fn new(id: String, event_type: EventType) -> Self {
         TextFieldEvent { id, event_type }
     }
-
-    pub fn to_app_event(&self) -> AppEvent {
-        AppEvent::TextField(self.clone())
-    }
 }
 
 fn start_editing(id: &str) -> TextFieldEvent {
@@ -220,16 +216,16 @@ fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
 pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled {
     match state.is_editing {
         true => match key.code {
-            KeyCode::Enter => handled(done_editing(&state.id, true).to_app_event()),
-            KeyCode::Char(k) => handled(enter_char(&state.id, k).to_app_event()),
-            KeyCode::Backspace => handled(delete_char(&state.id).to_app_event()),
-            KeyCode::Left => handled(move_cursor_left(&state.id).to_app_event()),
-            KeyCode::Right => handled(move_cursor_right(&state.id).to_app_event()),
-            KeyCode::Esc => handled(done_editing(&state.id, false).to_app_event()),
+            KeyCode::Enter => handled(done_editing(&state.id, true).into()),
+            KeyCode::Char(k) => handled(enter_char(&state.id, k).into()),
+            KeyCode::Backspace => handled(delete_char(&state.id).into()),
+            KeyCode::Left => handled(move_cursor_left(&state.id).into()),
+            KeyCode::Right => handled(move_cursor_right(&state.id).into()),
+            KeyCode::Esc => handled(done_editing(&state.id, false).into()),
             _ => not_handled(),
         },
         false => match key.code {
-            KeyCode::Enter => handled(start_editing(&state.id).to_app_event()),
+            KeyCode::Enter => handled(start_editing(&state.id).into()),
             _ => not_handled(),
         },
     }

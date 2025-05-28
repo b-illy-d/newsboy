@@ -4,6 +4,7 @@ use crate::component::{
     debug::{self, toggle_debug_logs, DebugLogsEvent},
     pubsub,
     reusable::text_field::{self, TextFieldEvent},
+    setup::SetupEvent,
 };
 use ratatui::crossterm::event::{
     KeyCode::{BackTab, Char, Tab},
@@ -24,6 +25,7 @@ pub enum AppEvent {
     NextRoute,
     PrevRoute,
     Debug(DebugLogsEvent),
+    Setup(SetupEvent),
     Quit,
 }
 
@@ -141,6 +143,28 @@ fn on_numeral_key(c: char) -> InputHandled {
         }
     }
     not_handled()
+}
+
+// =====================
+// ==== EVENT UTILS ====
+// =====================
+
+impl From<SetupEvent> for AppEvent {
+    fn from(event: SetupEvent) -> Self {
+        AppEvent::Setup(event)
+    }
+}
+
+impl From<DebugLogsEvent> for AppEvent {
+    fn from(event: DebugLogsEvent) -> Self {
+        AppEvent::Debug(event)
+    }
+}
+
+impl From<TextFieldEvent> for AppEvent {
+    fn from(event: TextFieldEvent) -> Self {
+        AppEvent::TextField(event)
+    }
 }
 
 // =====================

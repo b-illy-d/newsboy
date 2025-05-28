@@ -1,14 +1,20 @@
-use crossterm::event::{
-    KeyCode::{Char, Down, Enter, Up},
-    KeyEvent,
+use ratatui::{
+    crossterm::event::{
+        KeyCode::{Char, Down, Up},
+        KeyEvent,
+    },
+    layout::Rect,
+    style::Stylize,
+    text::Text,
+    widgets::Paragraph,
+    Frame,
 };
-use ratatui::{layout::Rect, style::Stylize, text::Text, widgets::Paragraph, Frame};
 use std::borrow::Cow;
 
 use crate::{
     app::App,
     component::reusable::text_field::draw_simple_text_field,
-    event::{AppEvent, InputHandled},
+    event::{handled, AppEvent, InputHandled},
 };
 
 // ===============
@@ -107,6 +113,42 @@ fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<App
 // ===============
 // ==== INPUT ====
 // ===============
+
+pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
+    let fields = Setup::get_fields_info();
+    let current_index = fields
+        .iter()
+        .position(|(n, _)| n == &state.focused)
+        .unwrap_or(0);
+    match key.code {
+        Up => {
+            let next_index = if current_index == 0 {
+                fields.len() - 1
+            } else {
+                current_index - 1
+            };
+            handled(focus_setup(fields[next_index].0).into())
+        }
+        Down => {
+            let fields = Setup::get_fields_info();
+            let current_index = fields
+                .iter()
+                .position(|(n, _)| n == &state.focused)
+                .unwrap_or(0);
+            let next_index = (current_index + 1) % fields.len();
+            focus_setup(fields[next_index].0)
+        }
+        Char(c) if c.is_ascii_alphanumeric() || c == '_' || c == '-' => set_value(
+            &state.focused,
+            &format!("{}{}", state.get(&state.focused), c),
+        ),
+        Enter => {
+            // Handle Enter key if needed
+            None
+        }
+        _ => None,
+    }
+}
 
 // ==============
 // ==== VIEW ====

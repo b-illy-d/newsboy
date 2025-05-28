@@ -47,16 +47,8 @@ pub enum DebugLogsEvent {
     ToggleVisibility,
 }
 
-impl DebugLogsEvent {
-    fn to_app_event(self) -> AppEvent {
-        match self {
-            DebugLogsEvent::ToggleVisibility => AppEvent::Debug(DebugLogsEvent::ToggleVisibility),
-        }
-    }
-}
-
 pub fn toggle_debug_logs() -> InputHandled {
-    handled(DebugLogsEvent::ToggleVisibility.to_app_event())
+    handled(DebugLogsEvent::ToggleVisibility.into())
 }
 
 pub fn on_tick(state: &mut App) -> Option<AppEvent> {
