@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            let mut ticker = time::interval(Duration::from_millis(50));
+            let mut ticker = time::interval(Duration::from_millis(100));
             loop {
                 ticker.tick().await;
                 if tx.send(AppEvent::Tick).await.is_err() {

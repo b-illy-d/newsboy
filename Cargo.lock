@@ -1524,6 +1524,7 @@ dependencies = [
  "google-cloud-pubsub",
  "log",
  "mockall",
+ "once_cell",
  "ratatui",
  "reqwest",
  "serde",

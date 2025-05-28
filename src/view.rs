@@ -7,15 +7,19 @@ use ratatui::{
 
 use crate::{
     app::{App, Route},
-    component::{header, setup, topics},
+    component::{debug, header, setup, topics},
 };
 
 pub fn draw(state: &App, f: &mut Frame) {
     let area = f.area();
+    let footer_h: u16 = match state.debug_logs.visible {
+        true => 15,
+        false => 3,
+    };
     let [header_area, main_area, footer_area] = Layout::vertical([
         Constraint::Length(6),
         Constraint::Min(0),
-        Constraint::Length(3),
+        Constraint::Length(footer_h),
     ])
     .margin(1)
     .areas(area);
@@ -34,7 +38,11 @@ fn draw_main(state: &App, f: &mut Frame, area: Rect) {
         }
     }
 }
+
 fn draw_footer(state: &App, f: &mut Frame, area: Rect) {
+    if state.debug_logs.visible {
+        return debug::draw(&state.debug_logs, f, area);
+    }
     let footer = format!("Ticks {}", state.ticks);
     let footer_paragraph = ratatui::widgets::Paragraph::new(footer)
         .block(Block::default().borders(Borders::ALL))

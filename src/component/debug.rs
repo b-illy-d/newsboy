@@ -5,41 +5,52 @@ use ratatui::{
     Frame,
 };
 use std::collections::VecDeque;
+use std::sync::Mutex;
 
+use crate::app::App;
 use crate::event::{handled, AppEvent, InputHandled};
+use once_cell::sync::Lazy;
 
-const MAX_LOG_LINES: usize = 100;
+pub static DEBUG_LOGS: Lazy<Mutex<VecDeque<String>>> = Lazy::new(|| Mutex::new(VecDeque::new()));
+
+const MAX_LOGS: usize = 10;
+
+pub fn debug_log<S: Into<String>>(msg: S) {
+    let mut logs = DEBUG_LOGS.lock().unwrap();
+    if logs.len() >= MAX_LOGS {
+        logs.pop_front();
+    }
+    logs.push_back(msg.into());
+}
+
 #[derive(Default)]
 pub struct DebugLogs {
-    pub logs: VecDeque<String>,
     pub visible: bool,
+    pub logs: Vec<String>,
 }
 
 impl DebugLogs {
     pub fn default() -> Self {
         DebugLogs {
-            logs: VecDeque::with_capacity(MAX_LOG_LINES),
+            logs: Vec::new(),
             visible: false,
         }
     }
-    pub fn log<S: Into<String>>(&mut self, msg: S) {
-        if self.logs.len() >= MAX_LOG_LINES {
-            self.logs.pop_front();
-        }
-        self.logs.push_back(msg.into());
+
+    fn drain_logs(&mut self) {
+        let logs = DEBUG_LOGS.lock().unwrap();
+        self.logs = logs.iter().cloned().collect();
     }
 }
 
 pub enum DebugLogsEvent {
     ToggleVisibility,
-    LogMessage(String),
 }
 
 impl DebugLogsEvent {
     fn to_app_event(self) -> AppEvent {
         match self {
             DebugLogsEvent::ToggleVisibility => AppEvent::Debug(DebugLogsEvent::ToggleVisibility),
-            DebugLogsEvent::LogMessage(msg) => AppEvent::Debug(DebugLogsEvent::LogMessage(msg)),
         }
     }
 }
@@ -48,23 +59,22 @@ pub fn toggle_debug_logs() -> InputHandled {
     handled(DebugLogsEvent::ToggleVisibility.to_app_event())
 }
 
-pub fn debug_log(msg: String) -> AppEvent {
-    DebugLogsEvent::LogMessage(msg).to_app_event()
+pub fn on_tick(state: &mut App) -> Option<AppEvent> {
+    if state.ticks % 5 != 0 {
+        return None;
+    }
+    state.debug_logs.drain_logs();
+    None
 }
 
 pub fn on_event(state: &mut DebugLogs, event: DebugLogsEvent) {
     match event {
         DebugLogsEvent::ToggleVisibility => on_logs_visibility_toggle(state),
-        DebugLogsEvent::LogMessage(msg) => on_log_message(state, msg),
     }
 }
 
 fn on_logs_visibility_toggle(state: &mut DebugLogs) {
     state.visible = !state.visible;
-}
-
-fn on_log_message(state: &mut DebugLogs, msg: String) {
-    state.log(msg);
 }
 
 pub fn draw(state: &DebugLogs, f: &mut Frame, area: Rect) {

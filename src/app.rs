@@ -5,10 +5,12 @@ use crate::component::{
     setup::Setup,
     topics::TopicsState,
 };
+use crate::event::AppEvent;
 use ratatui::{style::Stylize, text::Line};
 use std::time::Instant;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
+use tokio::sync::mpsc::Sender;
 
 pub enum Focus {
     Global,
@@ -76,6 +78,7 @@ impl App {
     }
 
     pub fn init(&mut self) {
+        // Initialize the setup fields
         let fields = Setup::get_fields_info();
         for (name, label) in fields {
             self.text_fields

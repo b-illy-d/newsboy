@@ -1,11 +1,12 @@
 use crate::app::{App, Focus, Route};
+use crate::component::debug::debug_log;
 use crate::component::{
-    debug::{self, toggle_debug_logs},
+    debug::{self, toggle_debug_logs, DebugLogsEvent},
     pubsub,
     reusable::text_field::{self, TextFieldEvent},
 };
 use ratatui::crossterm::event::{
-    KeyCode::{Char, Tab},
+    KeyCode::{BackTab, Char, Tab},
     KeyEvent, KeyModifiers,
 };
 use strum::IntoEnumIterator;
@@ -24,6 +25,14 @@ pub enum AppEvent {
     PrevRoute,
     Debug(DebugLogsEvent),
     Quit,
+}
+
+pub fn previous_route() -> AppEvent {
+    AppEvent::PrevRoute
+}
+
+pub fn next_route() -> AppEvent {
+    AppEvent::NextRoute
 }
 
 pub fn quit() -> AppEvent {
@@ -56,16 +65,17 @@ pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
             None
         }
         AppEvent::Debug(event) => {
-            debug::on_event(state.debug_logs, event);
+            debug::on_event(&mut state.debug_logs, event);
             None
         }
         AppEvent::Quit => on_quit(state),
     }
 }
 
-pub fn on_tick(app: &mut App) -> Option<AppEvent> {
-    app.ticks += 1;
-    app.last_tick = std::time::Instant::now();
+pub fn on_tick(state: &mut App) -> Option<AppEvent> {
+    state.ticks += 1;
+    state.last_tick = std::time::Instant::now();
+    debug::on_tick(state);
     None
 }
 
@@ -110,10 +120,15 @@ pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
 }
 
 async fn global_on_key(key: KeyEvent) -> InputHandled {
+    debug_log(format!(
+        "Global key event: code {:?}, modifiers {:?}",
+        key.code, key.modifiers
+    ));
     match key.code {
-        Tab => on_tab_key(key),
+        Tab => handled(next_route()),
+        BackTab => handled(previous_route()),
         Char(c @ '0'..='9') => on_numeral_key(c),
-        Char(':') => toggle_debug_logs(),
+        Char(';') => toggle_debug_logs(),
         Char('q') => handled(quit()),
         _ => not_handled(),
     }
@@ -126,15 +141,6 @@ fn on_numeral_key(c: char) -> InputHandled {
         }
     }
     not_handled()
-}
-
-fn on_tab_key(key: KeyEvent) -> InputHandled {
-    if key.modifiers.contains(KeyModifiers::SHIFT) {
-        println!("Prev route triggered");
-        handled(AppEvent::PrevRoute)
-    } else {
-        handled(AppEvent::NextRoute)
-    }
 }
 
 // =====================
