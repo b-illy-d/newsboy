@@ -2,14 +2,9 @@ use crate::component::{
     debug::DebugLogs, pubsub::PubsubState, reusable::text_field::TextFields, setup::Setup,
     topics::TopicsState,
 };
+use crate::input::Focus;
 use crate::route::Route;
 use std::time::Instant;
-
-#[derive(Debug)]
-pub enum Focus {
-    Global,
-    TextField(String),
-}
 
 pub struct App {
     pub route: Route,

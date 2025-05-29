@@ -1,4 +1,5 @@
-use crate::event::{handled, not_handled, AppEvent, InputHandled};
+use crate::event::AppEvent;
+use crate::input::{handled, not_handled, InputHandled};
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Position, Rect},
@@ -67,7 +68,6 @@ pub struct TextField {
     pub input: String,
     pub character_index: usize,
     pub is_editing: bool,
-    pub is_focused: bool,
 }
 
 impl TextField {
@@ -79,23 +79,11 @@ impl TextField {
             input: String::new(),
             character_index: 0,
             is_editing: false,
-            is_focused: false,
         }
     }
 
     fn reset_cursor(&mut self) {
         self.character_index = 0;
-    }
-
-    pub fn expect(&self, name: &str) -> &TextField {
-        if self.name == name {
-            self
-        } else {
-            panic!(
-                "Expected TextField with name '{}', but found '{}'",
-                name, self.name
-            );
-        }
     }
 }
 
@@ -106,8 +94,6 @@ impl TextField {
 #[derive(Debug, Clone)]
 pub enum TextFieldEventType {
     StartEditing,
-    Focus,
-    Unfocus,
     DoneEditing(bool),
     InputChar(String),
     DeleteChar,
@@ -125,14 +111,6 @@ impl TextFieldEvent {
     pub fn new(name: String, event_type: TextFieldEventType) -> Self {
         TextFieldEvent { name, event_type }
     }
-}
-
-pub fn focus_text_field(name: &str) -> TextFieldEvent {
-    TextFieldEvent::new(name.to_string(), TextFieldEventType::Focus)
-}
-
-pub fn release_text_field(name: &str) -> TextFieldEvent {
-    TextFieldEvent::new(name.to_string(), TextFieldEventType::Unfocus)
 }
 
 fn start_editing(name: &str) -> TextFieldEvent {
@@ -174,19 +152,12 @@ pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<AppEvent> {
         TextFieldEventType::DeleteChar => on_delete_char(state),
         TextFieldEventType::MoveCursorLeft => on_move_cursor_left(state),
         TextFieldEventType::MoveCursorRight => on_move_cursor_right(state),
-        TextFieldEventType::Focus => {
-            state.is_focused = true;
-            None
-        }
-        TextFieldEventType::Unfocus => {
-            state.is_focused = false;
-            None
-        }
     }
 }
 
 fn on_start_editing(state: &mut TextField) -> Option<AppEvent> {
     state.is_editing = true;
+    state.input = state.value.clone();
     None
 }
 
@@ -276,7 +247,7 @@ pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled {
 // ==== VIEWS ====
 // ===============
 
-pub fn draw_simple_text_field(state: &TextField, frame: &mut Frame, rect: Rect) {
+pub fn draw_simple_text_field(state: &TextField, is_focused: bool, frame: &mut Frame, rect: Rect) {
     let adjusted_rect = Rect {
         x: rect.x,
         y: rect.y,
@@ -285,7 +256,7 @@ pub fn draw_simple_text_field(state: &TextField, frame: &mut Frame, rect: Rect) 
     };
 
     let input = (match state.is_editing {
-        false => Paragraph::new(state.value.as_str()).style(match state.is_focused {
+        false => Paragraph::new(state.value.as_str()).style(match is_focused {
             true => Style::default().bold().green(),
             false => Style::default(),
         }),
@@ -295,7 +266,7 @@ pub fn draw_simple_text_field(state: &TextField, frame: &mut Frame, rect: Rect) 
         Block::default()
             .title(state.label.clone())
             .borders(ratatui::widgets::Borders::ALL)
-            .border_style(match state.is_focused {
+            .border_style(match is_focused {
                 true => Style::default().bold(),
                 false => Style::default(),
             }),

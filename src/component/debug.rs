@@ -8,7 +8,8 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 
 use crate::app::App;
-use crate::event::{handled, AppEvent, InputHandled};
+use crate::event::AppEvent;
+use crate::input::{handled, InputHandled};
 use once_cell::sync::Lazy;
 
 pub static DEBUG_LOGS: Lazy<Mutex<VecDeque<String>>> = Lazy::new(|| Mutex::new(VecDeque::new()));

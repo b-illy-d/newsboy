@@ -13,10 +13,10 @@ use std::borrow::Cow;
 
 use crate::{
     app::App,
-    component::reusable::text_field::{
-        draw_simple_text_field, focus_text_field, TextFieldEvent, TextFieldEventType,
-    },
-    event::{handled, not_handled, AppEvent, InputHandled},
+    component::debug::debug_log,
+    component::reusable::text_field::{draw_simple_text_field, TextFieldEvent, TextFieldEventType},
+    event::AppEvent,
+    input::{focus_to, handled, not_handled, Focus, InputHandled},
 };
 
 // ===============
@@ -84,7 +84,7 @@ impl Setup {
 pub enum SetupEvent {
     ChangeSetupValue(String, String),
     EditSetupValue(String),
-    FocusSetup(String),
+    Focus(String),
 }
 
 fn edit_value(name: &str) -> SetupEvent {
@@ -96,9 +96,8 @@ fn set_value(name: &str, value: &str) -> SetupEvent {
 }
 
 fn focus_setup(name: &str) -> SetupEvent {
-    SetupEvent::FocusSetup(name.to_string())
+    SetupEvent::Focus(name.to_string())
 }
-
 // ==================
 // ==== HANDLERS ====
 // ==================
@@ -106,9 +105,9 @@ fn focus_setup(name: &str) -> SetupEvent {
 pub fn on_event(state: &mut Setup, e: SetupEvent) -> Option<AppEvent> {
     match e {
         SetupEvent::ChangeSetupValue(name, value) => on_change_value(state, name, value),
-        SetupEvent::FocusSetup(name) => {
-            state.focused = name;
-            Some(focus_text_field(&state.focused).into())
+        SetupEvent::Focus(name) => {
+            state.focused = name.clone();
+            Some(focus_to(Focus::TextField(name.clone())))
         }
         _ => None,
     }
@@ -121,8 +120,9 @@ fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<App
 
 pub fn on_arrive() -> Option<AppEvent> {
     let first_field = Setup::get_fields_info().first().unwrap().0;
-    Some(focus_text_field(first_field).into())
+    Some(focus_to(Focus::TextField(first_field.to_string())))
 }
+
 // ===============
 // ==== INPUT ====
 // ===============
@@ -133,6 +133,10 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
         .iter()
         .position(|(n, _)| n == &state.focused)
         .unwrap_or(0);
+    debug_log(format!(
+        "current_index={}, focused={}",
+        current_index, state.focused
+    ));
     match key.code {
         Up => {
             let next_index = if current_index == 0 {
@@ -140,19 +144,19 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
             } else {
                 current_index - 1
             };
+            debug_log(format!(
+                "Next idx {} next field {}",
+                next_index, fields[next_index].0
+            ));
             handled(focus_setup(fields[next_index].0).into())
         }
         Down => {
             let next_index = (current_index + 1) % fields.len();
+            debug_log(format!(
+                "Next idx {} next field {}",
+                next_index, fields[next_index].0
+            ));
             handled(focus_setup(fields[next_index].0).into())
-        }
-        Char(' ') => {
-            let current_field = fields[current_index].0;
-            let event = TextFieldEvent {
-                name: current_field.to_string(),
-                event_type: TextFieldEventType::StartEditing,
-            };
-            handled(event.into())
         }
         _ => not_handled(),
     }
@@ -202,6 +206,7 @@ fn draw_fields(state: &App, f: &mut Frame, area: Rect) {
     for (i, (name, _label)) in fields.iter().enumerate() {
         let field = state.text_fields.get(name);
         let field_area = ratatui::layout::Rect::new(area.x, area.y + i as u16 * 3, width(name), 1);
-        draw_simple_text_field(field, f, field_area);
+        let is_focused = &state.setup.focused == name;
+        draw_simple_text_field(field, is_focused, f, field_area);
     }
 }

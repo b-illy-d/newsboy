@@ -5,6 +5,7 @@ use tokio::{sync::mpsc, time};
 mod app;
 mod component;
 mod event;
+mod input;
 mod route;
 mod view;
 
