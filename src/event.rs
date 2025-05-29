@@ -1,4 +1,4 @@
-use crate::app::{App, Focus, Route};
+use crate::app::{App, Focus};
 use crate::component::debug::debug_log;
 use crate::component::{
     debug::{self, toggle_debug_logs, DebugLogsEvent},
@@ -6,6 +6,8 @@ use crate::component::{
     reusable::text_field::{self, TextFieldEvent},
     setup::{self, SetupEvent},
 };
+use crate::route;
+use crate::route::{next_route, previous_route, select_route, Route, RouteEvent};
 use ratatui::crossterm::event::{
     KeyCode::{BackTab, Char, Tab},
     KeyEvent, KeyModifiers,
@@ -20,21 +22,11 @@ pub enum AppEvent {
     Tick,
     Input(KeyEvent),
     Pubsub(pubsub::PubsubEvent),
+    Route(RouteEvent),
     TextField(TextFieldEvent),
-    SelectRoute(Route),
-    NextRoute,
-    PrevRoute,
     Debug(DebugLogsEvent),
     Setup(SetupEvent),
     Quit,
-}
-
-pub fn previous_route() -> AppEvent {
-    AppEvent::PrevRoute
-}
-
-pub fn next_route() -> AppEvent {
-    AppEvent::NextRoute
 }
 
 pub fn quit() -> AppEvent {
@@ -49,22 +41,11 @@ pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
     match e {
         AppEvent::Tick => on_tick(state),
         AppEvent::Input(key) => on_key(state, key).await,
+        AppEvent::Route(event) => route::on_event(state, event),
         AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut state.pubsub, pubsub_event).await,
         AppEvent::TextField(event) => {
             let field = state.text_fields.get_mut(&event.id);
             text_field::on_event(field, event)
-        }
-        AppEvent::SelectRoute(route) => {
-            state.route = route;
-            None
-        }
-        AppEvent::NextRoute => {
-            state.route = state.route.next();
-            None
-        }
-        AppEvent::PrevRoute => {
-            state.route = state.route.previous();
-            None
         }
         AppEvent::Debug(event) => {
             debug::on_event(&mut state.debug_logs, event);
@@ -143,7 +124,7 @@ async fn global_on_key(key: KeyEvent) -> InputHandled {
 fn on_numeral_key(c: char) -> InputHandled {
     if let Some(digit) = c.to_digit(10) {
         if let Some(route) = Route::iter().nth((digit - 1) as usize) {
-            return handled(AppEvent::SelectRoute(route));
+            return handled(select_route(route));
         }
     }
     not_handled()
@@ -153,6 +134,11 @@ fn on_numeral_key(c: char) -> InputHandled {
 // ==== EVENT UTILS ====
 // =====================
 
+impl From<RouteEvent> for AppEvent {
+    fn from(event: RouteEvent) -> Self {
+        AppEvent::Route(event)
+    }
+}
 impl From<SetupEvent> for AppEvent {
     fn from(event: SetupEvent) -> Self {
         AppEvent::Setup(event)

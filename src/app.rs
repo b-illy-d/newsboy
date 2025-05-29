@@ -1,51 +1,13 @@
 use crate::component::{
-    debug::{debug_log, DebugLogs},
-    pubsub::PubsubState,
-    reusable::text_field::TextFields,
-    setup::Setup,
+    debug::DebugLogs, pubsub::PubsubState, reusable::text_field::TextFields, setup::Setup,
     topics::TopicsState,
 };
-use crate::event::AppEvent;
-use ratatui::{style::Stylize, text::Line};
+use crate::route::Route;
 use std::time::Instant;
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter, FromRepr};
-use tokio::sync::mpsc::Sender;
 
 pub enum Focus {
     Global,
     TextField(String),
-}
-
-#[derive(Debug, Default, Clone, Copy, Display, FromRepr, EnumIter)]
-pub enum Route {
-    #[default]
-    #[strum(serialize = "Setup")]
-    Setup,
-    #[strum(serialize = "Topics")]
-    Topics,
-}
-
-impl Route {
-    pub fn titles() -> Vec<Line<'static>> {
-        Route::iter()
-            .enumerate()
-            .map(|(i, r)| Line::from(format!("[{}] {}", i + 1, r)).light_blue())
-            .collect()
-    }
-
-    pub fn next(self) -> Self {
-        let index = (self as usize + 1) % Self::iter().len();
-        Self::from_repr(index).unwrap()
-    }
-
-    pub fn previous(self) -> Self {
-        let count = Self::iter().len();
-        let index = (self as usize + count - 1) % count;
-        let prev = Self::from_repr(index).unwrap();
-        debug_log(format!("Previous route: {:?}", prev));
-        prev
-    }
 }
 
 pub struct App {

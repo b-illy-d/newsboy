@@ -2,7 +2,7 @@ use crate::event::{handled, not_handled, AppEvent, InputHandled};
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Position, Rect},
-    style::{Color, Style, Styled, Stylize},
+    style::{Style, Stylize},
     widgets::{Block, Paragraph},
     Frame,
 };

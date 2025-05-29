@@ -6,8 +6,9 @@ use ratatui::{
 };
 
 use crate::{
-    app::{App, Route},
+    app::App,
     component::{debug, header, setup, topics},
+    route::Route,
 };
 
 pub fn draw(state: &App, f: &mut Frame) {

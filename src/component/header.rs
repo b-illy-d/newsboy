@@ -1,13 +1,11 @@
-use crate::app::{App, Route};
+use crate::app::App;
+use crate::route::Route;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{block::Title, Block, Borders, Paragraph, Tabs},
     Frame,
 };
-use strum::IntoEnumIterator;
-
-use super::reusable::text_field::draw_simple_text_field;
 
 // ==============
 // ==== VIEW ====
