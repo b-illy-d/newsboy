@@ -13,7 +13,9 @@ use std::borrow::Cow;
 
 use crate::{
     app::App,
-    component::reusable::text_field::{draw_simple_text_field, TextFieldEvent, TextFieldEventType},
+    component::reusable::text_field::{
+        draw_simple_text_field, focus_text_field, TextFieldEvent, TextFieldEventType,
+    },
     event::{handled, not_handled, AppEvent, InputHandled},
 };
 
@@ -78,6 +80,7 @@ impl Setup {
 // ==== EVENTS ====
 // ================
 
+#[derive(Debug)]
 pub enum SetupEvent {
     ChangeSetupValue(String, String),
     EditSetupValue(String),
@@ -105,7 +108,7 @@ pub fn on_event(state: &mut Setup, e: SetupEvent) -> Option<AppEvent> {
         SetupEvent::ChangeSetupValue(name, value) => on_change_value(state, name, value),
         SetupEvent::FocusSetup(name) => {
             state.focused = name;
-            None
+            Some(focus_text_field(&state.focused).into())
         }
         _ => None,
     }
@@ -116,6 +119,10 @@ fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<App
     None
 }
 
+pub fn on_arrive() -> Option<AppEvent> {
+    let first_field = Setup::get_fields_info().first().unwrap().0;
+    Some(focus_text_field(first_field).into())
+}
 // ===============
 // ==== INPUT ====
 // ===============
@@ -142,7 +149,7 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
         Char(' ') => {
             let current_field = fields[current_index].0;
             let event = TextFieldEvent {
-                id: current_field.to_string(),
+                name: current_field.to_string(),
                 event_type: TextFieldEventType::StartEditing,
             };
             handled(event.into())

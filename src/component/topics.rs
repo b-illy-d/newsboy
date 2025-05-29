@@ -5,6 +5,7 @@ use ratatui::{
     Frame,
 };
 
+#[derive(Debug)]
 pub struct TopicInfo {
     pub name: String,
 }

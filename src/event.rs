@@ -18,6 +18,7 @@ use strum::IntoEnumIterator;
 // ==== EVENTS ====
 // ================
 
+#[derive(Debug)]
 pub enum AppEvent {
     Tick,
     Input(KeyEvent),
@@ -38,13 +39,16 @@ pub fn quit() -> AppEvent {
 // ==================
 
 pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
+    if !matches!(e, AppEvent::Tick) {
+        debug_log(format!("Handling event: {:?}", e));
+    }
     match e {
         AppEvent::Tick => on_tick(state),
         AppEvent::Input(key) => on_key(state, key).await,
         AppEvent::Route(event) => route::on_event(state, event),
         AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut state.pubsub, pubsub_event).await,
         AppEvent::TextField(event) => {
-            let field = state.text_fields.get_mut(&event.id);
+            let field = state.text_fields.get_mut(&event.name);
             text_field::on_event(field, event)
         }
         AppEvent::Debug(event) => {
@@ -83,6 +87,7 @@ pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
         }
     }
 
+    debug_log(format!("App focus: {:?}", state.focus));
     let focused_result = match state.focus {
         Focus::Global => global_on_key(key).await,
         Focus::TextField(ref id) => {
@@ -139,6 +144,7 @@ impl From<RouteEvent> for AppEvent {
         AppEvent::Route(event)
     }
 }
+
 impl From<SetupEvent> for AppEvent {
     fn from(event: SetupEvent) -> Self {
         AppEvent::Setup(event)

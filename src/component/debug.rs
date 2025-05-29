@@ -43,6 +43,7 @@ impl DebugLogs {
     }
 }
 
+#[derive(Debug)]
 pub enum DebugLogsEvent {
     ToggleVisibility,
 }

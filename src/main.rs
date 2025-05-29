@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut app = App::new();
-    app.init();
+    app::init(&mut app);
 
     // Event handling
     loop {

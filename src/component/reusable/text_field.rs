@@ -6,23 +6,41 @@ use ratatui::{
     widgets::{Block, Paragraph},
     Frame,
 };
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::collections::HashMap;
 
 pub struct TextFields {
     pub fields: HashMap<String, TextField>,
+    pub focused: Option<String>,
 }
 
 impl TextFields {
     pub fn new() -> Self {
         TextFields {
             fields: HashMap::new(),
+            focused: None,
+        }
+    }
+
+    pub fn set_focus(&mut self, name: &str) {
+        if self.fields.contains_key(name) {
+            self.focused = Some(name.to_string());
+        } else if name == "None" {
+            self.focused = None;
+        } else {
+            panic!("TextField with name '{}' does not exist", name);
         }
     }
 
     pub fn add(&mut self, name: &str, label: &str, init_value: Option<String>) {
+        if self.fields.contains_key(name) {
+            panic!("TextField with name '{}' already exists", name);
+        }
+        if name.is_empty() {
+            panic!("TextField name cannot be empty");
+        }
+        if name == "None" {
+            panic!("TextField name cannot be called 'None'");
+        }
         let field = TextField::new(name, label, init_value);
         self.fields.insert(field.name.clone(), field);
     }
@@ -43,7 +61,6 @@ impl TextFields {
 }
 
 pub struct TextField {
-    pub id: String,
     pub name: String,
     pub label: String,
     pub value: String,
@@ -53,14 +70,9 @@ pub struct TextField {
     pub is_focused: bool,
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 impl TextField {
     pub fn new(name: &str, label: &str, init_value: Option<String>) -> Self {
-        let uniq = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let id = format!("{}-{}", name, uniq);
         Self {
-            id,
             name: name.to_string(),
             label: label.to_string(),
             value: init_value.unwrap_or(String::new()),
@@ -75,13 +87,13 @@ impl TextField {
         self.character_index = 0;
     }
 
-    pub fn expect(&self, id: &str) -> &TextField {
-        if self.id == id {
+    pub fn expect(&self, name: &str) -> &TextField {
+        if self.name == name {
             self
         } else {
             panic!(
-                "Expected TextField with id '{}', but found '{}'",
-                id, self.id
+                "Expected TextField with name '{}', but found '{}'",
+                name, self.name
             );
         }
     }
@@ -91,9 +103,11 @@ impl TextField {
 // ==== EVENTS ====
 // ================
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum TextFieldEventType {
     StartEditing,
+    Focus,
+    Unfocus,
     DoneEditing(bool),
     InputChar(String),
     DeleteChar,
@@ -101,40 +115,51 @@ pub enum TextFieldEventType {
     MoveCursorRight,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TextFieldEvent {
-    pub id: String,
+    pub name: String,
     pub event_type: TextFieldEventType,
 }
 
 impl TextFieldEvent {
-    pub fn new(id: String, event_type: TextFieldEventType) -> Self {
-        TextFieldEvent { id, event_type }
+    pub fn new(name: String, event_type: TextFieldEventType) -> Self {
+        TextFieldEvent { name, event_type }
     }
 }
 
-fn start_editing(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::StartEditing)
+pub fn focus_text_field(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::Focus)
 }
 
-fn done_editing(id: &str, submit: bool) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::DoneEditing(submit))
+pub fn release_text_field(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::Unfocus)
 }
 
-fn enter_char(id: &str, c: char) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::InputChar(c.to_string()))
+fn start_editing(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::StartEditing)
 }
 
-fn delete_char(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::DeleteChar)
+fn done_editing(name: &str, submit: bool) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::DoneEditing(submit))
 }
 
-fn move_cursor_left(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::MoveCursorLeft)
+fn enter_char(name: &str, c: char) -> TextFieldEvent {
+    TextFieldEvent::new(
+        name.to_string(),
+        TextFieldEventType::InputChar(c.to_string()),
+    )
 }
 
-fn move_cursor_right(id: &str) -> TextFieldEvent {
-    TextFieldEvent::new(id.to_string(), TextFieldEventType::MoveCursorRight)
+fn delete_char(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::DeleteChar)
+}
+
+fn move_cursor_left(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::MoveCursorLeft)
+}
+
+fn move_cursor_right(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::MoveCursorRight)
 }
 
 // ==================
@@ -149,6 +174,14 @@ pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<AppEvent> {
         TextFieldEventType::DeleteChar => on_delete_char(state),
         TextFieldEventType::MoveCursorLeft => on_move_cursor_left(state),
         TextFieldEventType::MoveCursorRight => on_move_cursor_right(state),
+        TextFieldEventType::Focus => {
+            state.is_focused = true;
+            None
+        }
+        TextFieldEventType::Unfocus => {
+            state.is_focused = false;
+            None
+        }
     }
 }
 
@@ -182,7 +215,7 @@ fn on_move_cursor_right(state: &mut TextField) -> Option<AppEvent> {
 fn on_enter_char(state: &mut TextField, new_char: char) -> Option<AppEvent> {
     let index = byte_index(state);
     state.input.insert(index, new_char);
-    Some(AppEvent::TextField(move_cursor_right(&state.id)))
+    Some(AppEvent::TextField(move_cursor_right(&state.name)))
 }
 
 fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
@@ -203,7 +236,7 @@ fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
         // Put all characters together except the selected one.
         // By leaving the selected one out, it is forgotten and therefore deleted.
         state.input = before_char_to_delete.chain(after_char_to_delete).collect();
-        Some(AppEvent::TextField(move_cursor_left(&state.id)))
+        Some(AppEvent::TextField(move_cursor_left(&state.name)))
     } else {
         None
     }
@@ -213,19 +246,27 @@ fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
 // ==== INPUT ====
 // ===============
 
+pub fn on_key_router(state: &TextFields, name: &str, key: KeyEvent) -> InputHandled {
+    if let Some(text_field) = state.fields.get(name) {
+        on_key(text_field, key)
+    } else {
+        not_handled()
+    }
+}
+
 pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled {
     match state.is_editing {
         true => match key.code {
-            KeyCode::Enter => handled(done_editing(&state.id, true).into()),
-            KeyCode::Char(k) => handled(enter_char(&state.id, k).into()),
-            KeyCode::Backspace => handled(delete_char(&state.id).into()),
-            KeyCode::Left => handled(move_cursor_left(&state.id).into()),
-            KeyCode::Right => handled(move_cursor_right(&state.id).into()),
-            KeyCode::Esc => handled(done_editing(&state.id, false).into()),
+            KeyCode::Enter => handled(done_editing(&state.name, true).into()),
+            KeyCode::Char(k) => handled(enter_char(&state.name, k).into()),
+            KeyCode::Backspace => handled(delete_char(&state.name).into()),
+            KeyCode::Left => handled(move_cursor_left(&state.name).into()),
+            KeyCode::Right => handled(move_cursor_right(&state.name).into()),
+            KeyCode::Esc => handled(done_editing(&state.name, false).into()),
             _ => not_handled(),
         },
         false => match key.code {
-            KeyCode::Enter => handled(start_editing(&state.id).into()),
+            KeyCode::Char(' ') => handled(start_editing(&state.name).into()),
             _ => not_handled(),
         },
     }
@@ -245,10 +286,10 @@ pub fn draw_simple_text_field(state: &TextField, frame: &mut Frame, rect: Rect) 
 
     let input = (match state.is_editing {
         false => Paragraph::new(state.value.as_str()).style(match state.is_focused {
-            true => Style::default().bold(),
+            true => Style::default().bold().green(),
             false => Style::default(),
         }),
-        true => Paragraph::new(state.input.as_str()).style(Style::default().bold()),
+        true => Paragraph::new(state.input.as_str()).style(Style::default().bold().yellow()),
     })
     .block(
         Block::default()

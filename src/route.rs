@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::component::debug::debug_log;
+use crate::component::{debug::debug_log, setup};
 use crate::event::AppEvent;
 use ratatui::{style::Stylize, text::Line};
 use strum::IntoEnumIterator;
@@ -36,6 +36,7 @@ impl Route {
     }
 }
 
+#[derive(Debug)]
 pub enum RouteEvent {
     Select(Route),
     Next,
@@ -58,7 +59,7 @@ pub fn on_event(state: &mut App, event: RouteEvent) -> Option<AppEvent> {
     match event {
         RouteEvent::Select(route) => {
             state.route = route;
-            None
+            None::<AppEvent>
         }
         RouteEvent::Next => {
             state.route = state.route.next();
@@ -68,5 +69,14 @@ pub fn on_event(state: &mut App, event: RouteEvent) -> Option<AppEvent> {
             state.route = state.route.previous();
             None
         }
+    };
+    after_route_change(state)
+}
+
+fn after_route_change(state: &mut App) -> Option<AppEvent> {
+    debug_log(format!("Route changed to: {:?}", state.route));
+    match state.route {
+        Route::Setup => setup::on_arrive(),
+        _ => None,
     }
 }

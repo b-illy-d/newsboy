@@ -5,6 +5,7 @@ use crate::component::{
 use crate::route::Route;
 use std::time::Instant;
 
+#[derive(Debug)]
 pub enum Focus {
     Global,
     TextField(String),
@@ -38,13 +39,14 @@ impl App {
             debug_logs: DebugLogs::default(),
         }
     }
+}
 
-    pub fn init(&mut self) {
-        // Initialize the setup fields
-        let fields = Setup::get_fields_info();
-        for (name, label) in fields {
-            self.text_fields
-                .add(name, label, Some(self.setup.get(name).to_string()));
-        }
+pub fn init(state: &mut App) {
+    // Initialize the setup fields
+    let fields = Setup::get_fields_info();
+    for (name, label) in fields {
+        state
+            .text_fields
+            .add(name, label, Some(state.setup.get(name).to_string()));
     }
 }
