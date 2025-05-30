@@ -59,7 +59,7 @@ fn draw_tabs(state: &App, f: &mut Frame, area: Rect) {
         .divider("|")
         .block(
             Block::default()
-                .light_blue()
+                .light_green()
                 .borders(Borders::ALL)
                 .title(Title::from("Press TAB or number keys to navigate"))
                 .title_alignment(Alignment::Center),

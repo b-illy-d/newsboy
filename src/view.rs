@@ -1,7 +1,7 @@
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    style::{Color, Style},
-    widgets::{Block, Borders},
+    layout::{Alignment::Right, Constraint, Layout, Rect},
+    style::{Color, Style, Stylize},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -32,7 +32,7 @@ pub fn draw(state: &App, f: &mut Frame) {
 fn draw_main(state: &App, f: &mut Frame, area: Rect) {
     match state.route {
         Route::Setup => {
-            setup::draw(state, f, area);
+            setup::draw(&state.setup, f, area);
         }
         Route::Topics => {
             topics::draw(state, f, area);
@@ -44,10 +44,22 @@ fn draw_footer(state: &App, f: &mut Frame, area: Rect) {
     if state.debug_logs.visible {
         return debug::draw(&state.debug_logs, f, area);
     }
-    let footer = format!("Ticks {}", state.ticks);
-    let footer_paragraph = ratatui::widgets::Paragraph::new(footer)
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::Yellow));
+    let border = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().light_green());
+    f.render_widget(border, area);
 
-    f.render_widget(footer_paragraph, area);
+    let [app_area, static_area] = Layout::horizontal([Constraint::Min(0), Constraint::Length(50)])
+        .margin(1)
+        .areas(area);
+
+    let app_help_paragraph =
+        Paragraph::new(state.help_text.clone()).style(Style::default().fg(Color::Yellow));
+    f.render_widget(app_help_paragraph, app_area);
+
+    let static_paragraph = Paragraph::new("Press ? for help ".to_string())
+        .style(Style::default().fg(Color::Yellow))
+        .alignment(Right);
+
+    f.render_widget(static_paragraph, static_area);
 }

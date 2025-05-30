@@ -1,142 +1,235 @@
+use crate::app::App;
 use ratatui::{
     crossterm::event::{
-        KeyCode::{Char, Down, Up},
+        KeyCode::{Down, Esc, Up},
         KeyEvent,
     },
-    layout::Rect,
-    style::Stylize,
-    text::Text,
-    widgets::Paragraph,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Stylize},
+    text::Line,
+    widgets::{Block, Borders},
     Frame,
 };
-use std::borrow::Cow;
+use std::collections::HashMap;
 
 use crate::{
-    app::App,
     component::debug::debug_log,
-    component::reusable::text_field::{draw_simple_text_field, TextFieldEvent, TextFieldEventType},
+    component::reusable::text_field::{draw_simple_text_field, TextField},
     event::AppEvent,
-    input::{focus_to, handled, not_handled, Focus, InputHandled},
+    input::{handled, not_handled, InputHandled},
 };
+
+use super::reusable::text_field::{self, TextFieldEvent};
 
 // ===============
 // ==== STATE ====
 // ===============
 
-const FIELDS: &[(&str, &str)] = &[
-    ("project_id", "Project ID"),
-    ("host", "Host"),
-    ("port", "Port"),
+struct SetupField {
+    name: &'static str,
+    label: &'static str,
+    value: &'static str,
+}
+
+const FIELDS: &[SetupField] = &[
+    SetupField {
+        name: "project_id",
+        label: "Project ID",
+        value: "",
+    },
+    SetupField {
+        name: "host",
+        label: "Host",
+        value: "localhost",
+    },
+    SetupField {
+        name: "port",
+        label: "Port",
+        value: "8065",
+    },
 ];
+
+const FIELD_NAMES: &[&str] = &["project_id", "host", "port"];
 
 #[derive(Default)]
 pub struct Setup {
-    project_id: String,
-    host: String,
-    port: u16,
-    pub focused: String,
+    fields: HashMap<String, TextField>,
+    pub focused: Option<String>,
 }
 
 impl Setup {
     pub fn default() -> Self {
         Setup {
-            project_id: String::new(),
-            host: "http://localhost".to_string(),
-            port: 8085,
-            focused: "project_id".to_string(),
+            fields: HashMap::new(),
+            focused: None,
         }
     }
 
-    pub fn get_fields_info() -> &'static [(&'static str, &'static str)] {
-        FIELDS
+    pub fn get_field_names() -> &'static [&'static str] {
+        FIELD_NAMES
     }
 
-    pub fn get(&self, name: &str) -> Cow<'_, str> {
-        match name {
-            "project_id" => Cow::Borrowed(&self.project_id),
-            "host" => Cow::Borrowed(&self.host),
-            "port" => Cow::Owned(self.port.to_string()),
-            _ => panic!("Unknown setting: {}", name),
+    pub fn get(&self, name: &str) -> String {
+        if !self.fields.contains_key(name) {
+            panic!("Unknown setting: {}", name);
         }
+        self.fields.get(name).unwrap().value.clone()
     }
 
     pub fn set(&mut self, name: &str, value: String) {
-        match name {
-            "project_id" => self.project_id = value,
-            "host" => self.host = value,
-            "port" => {
-                if let Ok(port) = value.parse::<u16>() {
-                    self.port = port;
-                } else {
-                    panic!("Invalid port value: {}", value);
-                }
-            }
-            _ => panic!("Unknown setting: {}", name),
+        if !self.fields.contains_key(name) {
+            panic!("Unknown setting: {}", name);
         }
+        let field = self.fields.get_mut(name).unwrap();
+        field.value = value;
     }
+}
+
+pub fn init(setup: &mut Setup) {
+    FIELDS.iter().for_each(|field| {
+        let mut tf = TextField::new(field.name, field.label);
+        if !field.value.is_empty() {
+            tf.set_value(field.value);
+        }
+        setup.fields.insert(field.name.to_string(), tf);
+    });
+}
+
+pub fn on_arrive(setup: &mut Setup) {
+    setup.focused = Some("project_id".to_string());
+}
+
+pub fn on_leave(setup: &mut Setup) {
+    setup.focused = None;
 }
 
 // ================
 // ==== EVENTS ====
 // ================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SetupEvent {
     ChangeSetupValue(String, String),
-    EditSetupValue(String),
-    Focus(String),
+    SetupFieldEvent(TextFieldEvent),
+    Focus(Option<String>),
 }
 
-fn edit_value(name: &str) -> SetupEvent {
-    SetupEvent::EditSetupValue(name.to_string())
+impl From<TextFieldEvent> for SetupEvent {
+    fn from(event: TextFieldEvent) -> Self {
+        SetupEvent::SetupFieldEvent(event)
+    }
+}
+
+impl From<InputHandled<TextFieldEvent>> for InputHandled<SetupEvent> {
+    fn from(handled: InputHandled<TextFieldEvent>) -> Self {
+        match handled {
+            InputHandled::Handled(event) => match event {
+                Some(e) => InputHandled::Handled(Some(e.into())),
+                None => InputHandled::Handled(None),
+            },
+            InputHandled::NotHandled => InputHandled::NotHandled,
+        }
+    }
+}
+
+impl From<InputHandled<SetupEvent>> for InputHandled<AppEvent> {
+    fn from(handled: InputHandled<SetupEvent>) -> Self {
+        match handled {
+            InputHandled::Handled(event) => InputHandled::Handled(event.map(AppEvent::from)),
+            InputHandled::NotHandled => InputHandled::NotHandled,
+        }
+    }
 }
 
 fn set_value(name: &str, value: &str) -> SetupEvent {
     SetupEvent::ChangeSetupValue(name.to_string(), value.to_string())
 }
 
-fn focus_setup(name: &str) -> SetupEvent {
-    SetupEvent::Focus(name.to_string())
+fn focus(name: &str) -> SetupEvent {
+    SetupEvent::Focus(Some(name.to_string()))
 }
+
+fn unfocus() -> SetupEvent {
+    SetupEvent::Focus(None)
+}
+
 // ==================
 // ==== HANDLERS ====
 // ==================
 
 pub fn on_event(state: &mut Setup, e: SetupEvent) -> Option<AppEvent> {
     match e {
+        SetupEvent::SetupFieldEvent(e) => on_field_event(state, e),
         SetupEvent::ChangeSetupValue(name, value) => on_change_value(state, name, value),
         SetupEvent::Focus(name) => {
             state.focused = name.clone();
-            Some(focus_to(Focus::TextField(name.clone())))
+            None
         }
-        _ => None,
     }
+    .map(AppEvent::from)
 }
 
-fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<AppEvent> {
+fn on_field_event(state: &mut Setup, e: TextFieldEvent) -> Option<SetupEvent> {
+    debug_log(format!("    Field event: {:?}", e));
+    let target = e.name.clone();
+    if !state.fields.contains_key(&target) {
+        panic!("Unknown field: {}", target);
+    }
+    let field = state.fields.get_mut(&target).unwrap();
+    text_field::on_event(field, e).map(SetupEvent::from)
+}
+
+fn on_change_value(state: &mut Setup, name: String, value: String) -> Option<SetupEvent> {
     state.set(&name, value);
     None
-}
-
-pub fn on_arrive() -> Option<AppEvent> {
-    let first_field = Setup::get_fields_info().first().unwrap().0;
-    Some(focus_to(Focus::TextField(first_field.to_string())))
 }
 
 // ===============
 // ==== INPUT ====
 // ===============
 
-pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
-    let fields = Setup::get_fields_info();
+pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled<AppEvent> {
+    let text_handled = on_text_field_key(state, key)
+        .map(SetupEvent::from)
+        .map(AppEvent::from);
+    if text_handled.is_handled() {
+        return text_handled;
+    }
+
+    match key.code {
+        Up | Down => on_arrow_key(state, key).into(),
+        Esc => {
+            if state.focused.is_some() {
+                handled(unfocus().into())
+            } else {
+                not_handled()
+            }
+        }
+        _ => not_handled(),
+    }
+}
+
+fn on_text_field_key(state: &Setup, key: KeyEvent) -> InputHandled<TextFieldEvent> {
+    if let Some(ref focused) = state.focused {
+        let field = state.fields.get(focused).unwrap();
+        text_field::on_key(field, key)
+    } else {
+        not_handled()
+    }
+}
+
+fn on_arrow_key(state: &Setup, key: KeyEvent) -> InputHandled<SetupEvent> {
+    let fields = Setup::get_field_names();
+
+    if matches!(state.focused, None) {
+        return handled(focus(fields[0]).into());
+    }
+
     let current_index = fields
         .iter()
-        .position(|(n, _)| n == &state.focused)
+        .position(|n| n == &state.focused.clone().unwrap())
         .unwrap_or(0);
-    debug_log(format!(
-        "current_index={}, focused={}",
-        current_index, state.focused
-    ));
+
     match key.code {
         Up => {
             let next_index = if current_index == 0 {
@@ -146,17 +239,17 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
             };
             debug_log(format!(
                 "Next idx {} next field {}",
-                next_index, fields[next_index].0
+                next_index, fields[next_index]
             ));
-            handled(focus_setup(fields[next_index].0).into())
+            handled(focus(fields[next_index]))
         }
         Down => {
             let next_index = (current_index + 1) % fields.len();
             debug_log(format!(
                 "Next idx {} next field {}",
-                next_index, fields[next_index].0
+                next_index, fields[next_index]
             ));
-            handled(focus_setup(fields[next_index].0).into())
+            handled(focus(fields[next_index]))
         }
         _ => not_handled(),
     }
@@ -166,47 +259,53 @@ pub fn on_key(state: &Setup, key: KeyEvent) -> InputHandled {
 // ==== VIEW ====
 // ==============
 
-pub fn draw(state: &App, f: &mut Frame, area: Rect) {
-    let block = ratatui::widgets::Block::default()
-        .title("Setup")
-        .light_red()
-        .borders(ratatui::widgets::Borders::ALL);
+const TITLE: &str = "Setup";
+const VIEWING_HELP: &str = "↑/↓ to navigate, Spacebar to edit";
+const EDITING_HELP: &str = "Editing: Press Enter to save, Esc to cancel";
+pub fn draw(state: &Setup, f: &mut Frame, area: Rect) {
+    let is_editing = match state.focused {
+        None => false,
+        Some(ref name) => state.fields.get(name).unwrap().is_editing,
+    };
+    let block = Block::default()
+        .title(TITLE.to_string())
+        .title_bottom(
+            Line::from(match is_editing {
+                true => EDITING_HELP.to_string(),
+                false => VIEWING_HELP.to_string(),
+            })
+            .right_aligned(),
+        )
+        .light_blue()
+        .fg(Color::LightCyan)
+        .bg(Color::Black)
+        .borders(Borders::ALL);
     f.render_widget(block, area);
 
-    let help_text = Paragraph::new(Text::from("↑/↓ to navigate, Space to edit")).light_red();
-
-    let [_padding, content_area] = ratatui::layout::Layout::default()
-        .margin(2)
-        .direction(ratatui::layout::Direction::Horizontal)
-        .constraints([
-            ratatui::layout::Constraint::Length(10),
-            ratatui::layout::Constraint::Max(100),
-        ])
+    let [content_area] = Layout::default()
+        .vertical_margin(2)
+        .horizontal_margin(10)
+        .constraints([Constraint::Length(100)])
+        .direction(Direction::Horizontal)
         .areas(area);
-
-    let [help_area, fields_area] = ratatui::layout::Layout::default()
-        .direction(ratatui::layout::Direction::Vertical)
-        .constraints([
-            ratatui::layout::Constraint::Length(2),
-            ratatui::layout::Constraint::Min(0),
-        ])
-        .areas(content_area);
-    f.render_widget(help_text, help_area);
-    draw_fields(state, f, fields_area);
+    draw_fields(state, f, content_area);
 }
 
-fn draw_fields(state: &App, f: &mut Frame, area: Rect) {
-    let fields = Setup::get_fields_info();
+fn draw_fields(state: &Setup, f: &mut Frame, area: Rect) {
+    let fields = Setup::get_field_names();
     fn width(name: &str) -> u16 {
         match name {
             "port" => 10,
             _ => 80,
         }
     }
-    for (i, (name, _label)) in fields.iter().enumerate() {
-        let field = state.text_fields.get(name);
-        let field_area = ratatui::layout::Rect::new(area.x, area.y + i as u16 * 3, width(name), 1);
-        let is_focused = &state.setup.focused == name;
+    for (i, name) in fields.iter().enumerate() {
+        let field = state.fields.get(*name).unwrap();
+        let field_area = Rect::new(area.x, area.y + i as u16 * 3, width(name), 1);
+        let is_focused = match &state.focused {
+            Some(n) => n == name,
+            None => false,
+        };
         draw_simple_text_field(field, is_focused, f, field_area);
     }
 }

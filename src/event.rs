@@ -3,10 +3,9 @@ use crate::component::debug::debug_log;
 use crate::component::{
     debug::{self, DebugLogsEvent},
     pubsub::{self, PubsubEvent},
-    reusable::text_field::{self, TextFieldEvent},
     setup::{self, SetupEvent},
 };
-use crate::input::{on_focus, on_key, Focus, InputHandled};
+use crate::input::{on_key, InputHandled};
 use crate::route;
 use crate::route::RouteEvent;
 use ratatui::crossterm::event::KeyEvent;
@@ -15,21 +14,24 @@ use ratatui::crossterm::event::KeyEvent;
 // ==== EVENTS ====
 // ================
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AppEvent {
     Tick,
     Input(KeyEvent),
     Pubsub(PubsubEvent),
     Route(RouteEvent),
-    TextField(TextFieldEvent),
     Debug(DebugLogsEvent),
     Setup(SetupEvent),
-    Focus(Focus),
+    HelpText(String),
     Quit,
 }
 
 pub fn quit() -> AppEvent {
     AppEvent::Quit
+}
+
+pub fn status_text(text: &str) -> AppEvent {
+    AppEvent::HelpText(text.to_string())
 }
 
 // ==================
@@ -38,29 +40,28 @@ pub fn quit() -> AppEvent {
 
 pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
     if !matches!(e, AppEvent::Tick) {
-        debug_log(format!("{:?}", e));
-        debug_log(format!("Focus: {:?}", state.focus));
+        debug_log(format!("IN {:?}", e));
     }
-    match e {
+    let ret = match e {
         AppEvent::Tick => on_tick(state),
         AppEvent::Input(key) => on_key(state, key).await,
-        AppEvent::Focus(focus) => on_focus(state, focus),
         AppEvent::Route(event) => route::on_event(state, event),
         AppEvent::Pubsub(pubsub_event) => pubsub::on_event(&mut state.pubsub, pubsub_event).await,
-        AppEvent::TextField(event) => {
-            let field = state.text_fields.get_mut(&event.name);
-            text_field::on_event(field, event)
-        }
         AppEvent::Debug(event) => {
             debug::on_event(&mut state.debug_logs, event);
             None
         }
-        AppEvent::Setup(event) => {
-            setup::on_event(&mut state.setup, event);
+        AppEvent::Setup(event) => setup::on_event(&mut state.setup, event),
+        AppEvent::HelpText(text) => {
+            state.help_text = text;
             None
         }
         AppEvent::Quit => on_quit(state),
+    };
+    if let Some(ref chain) = ret {
+        debug_log(format!("OUT {:?}", chain));
     }
+    ret
 }
 
 pub fn on_tick(state: &mut App) -> Option<AppEvent> {
@@ -79,8 +80,8 @@ pub fn on_quit(app: &mut App) -> Option<AppEvent> {
 // ==== EVENT UTILS ====
 // =====================
 
-impl From<InputHandled> for Option<AppEvent> {
-    fn from(handled: InputHandled) -> Self {
+impl From<InputHandled<AppEvent>> for Option<AppEvent> {
+    fn from(handled: InputHandled<AppEvent>) -> Self {
         match handled {
             InputHandled::Handled(event) => event,
             InputHandled::NotHandled => None,
@@ -103,11 +104,5 @@ impl From<SetupEvent> for AppEvent {
 impl From<DebugLogsEvent> for AppEvent {
     fn from(event: DebugLogsEvent) -> Self {
         AppEvent::Debug(event)
-    }
-}
-
-impl From<TextFieldEvent> for AppEvent {
-    fn from(event: TextFieldEvent) -> Self {
-        AppEvent::TextField(event)
     }
 }

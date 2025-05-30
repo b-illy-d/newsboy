@@ -8,7 +8,7 @@ pub struct PubsubState {
     pub topics: Vec<TopicInfo>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PubsubEvent {
     Topics(Vec<TopicInfo>),
 }

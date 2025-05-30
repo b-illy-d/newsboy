@@ -36,7 +36,7 @@ impl Route {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RouteEvent {
     Select(Route),
     Next,
@@ -56,27 +56,29 @@ pub fn select_route(route: Route) -> AppEvent {
 }
 
 pub fn on_event(state: &mut App, event: RouteEvent) -> Option<AppEvent> {
-    match event {
-        RouteEvent::Select(route) => {
-            state.route = route;
-            None::<AppEvent>
-        }
-        RouteEvent::Next => {
-            state.route = state.route.next();
-            None
-        }
-        RouteEvent::Prev => {
-            state.route = state.route.previous();
-            None
-        }
+    on_leave_route(state);
+    let new_route = match event {
+        RouteEvent::Select(route) => route,
+        RouteEvent::Next => state.route.next(),
+        RouteEvent::Prev => state.route.previous(),
     };
-    after_route_change(state)
+    state.route = new_route;
+    on_arrive_route(state, new_route)
 }
 
-fn after_route_change(state: &mut App) -> Option<AppEvent> {
-    debug_log(format!("Route changed to: {:?}", state.route));
+fn on_leave_route(state: &mut App) {
     match state.route {
-        Route::Setup => setup::on_arrive(),
-        _ => None,
+        Route::Setup => setup::on_leave(&mut state.setup),
+        Route::Topics => {
+            // Handle topics route leave if needed
+        }
     }
+}
+
+fn on_arrive_route(state: &mut App, route: Route) -> Option<AppEvent> {
+    match route {
+        Route::Setup => setup::on_arrive(&mut state.setup),
+        Route::Topics => {}
+    };
+    None
 }

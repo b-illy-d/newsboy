@@ -1,8 +1,7 @@
 use crate::app::App;
 use crate::component::{
-    debug::{debug_log, toggle_debug_logs},
-    reusable::text_field,
-    setup, topics,
+    debug::{debug_log, debug_logs_clear, toggle_debug_logs},
+    setup,
 };
 use crate::event::{quit, AppEvent};
 use crate::route::{next_route, previous_route, select_route, Route};
@@ -11,31 +10,6 @@ use ratatui::crossterm::event::{
     KeyEvent, KeyModifiers,
 };
 use strum::IntoEnumIterator;
-
-#[derive(Debug)]
-pub enum Focus {
-    Global,
-    TextField(String),
-}
-
-pub fn on_focus(state: &mut App, focus: Focus) -> Option<AppEvent> {
-    debug_log(format!(
-        "Changing focus from {:?} to {:?}",
-        state.focus, focus
-    ));
-    state.focus = focus;
-    match state.focus {
-        Focus::Global => {}
-        Focus::TextField(ref name) => {
-            state.text_fields.set_focus(name);
-        }
-    }
-    None
-}
-
-pub fn focus_to(focus: Focus) -> AppEvent {
-    AppEvent::Focus(focus)
-}
 
 // ======================
 // ==== HANDLE INPUT ====
@@ -46,22 +20,6 @@ pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
         return Some(quit());
     }
 
-    let focused_result = match state.focus {
-        Focus::Global => global_on_key(key).await,
-        Focus::TextField(ref id) => {
-            let field = state.text_fields.get(id);
-            text_field::on_key(field, key)
-        }
-    };
-
-    if focused_result.is_handled() {
-        debug_log(format!(
-            "Key {:?} handled focused: {:?}",
-            key.code, state.focus
-        ));
-        return focused_result.into();
-    }
-
     let route_result = match state.route {
         Route::Setup => setup::on_key(&state.setup, key),
         _ => not_handled(),
@@ -69,20 +27,16 @@ pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
 
     if route_result.is_handled() {
         debug_log(format!(
-            "Key {:?} handled route: {:?}",
+            "  Key {:?} handled route: {:?}",
             key.code, state.route
         ));
         return route_result.into();
     }
 
-    if !matches!(state.focus, Focus::Global) {
-        return global_on_key(key).await.into();
-    }
-
-    None
+    global_on_key(key).await.into()
 }
 
-async fn global_on_key(key: KeyEvent) -> InputHandled {
+async fn global_on_key(key: KeyEvent) -> InputHandled<AppEvent> {
     match key.code {
         Tab => handled(next_route()),
         BackTab => handled(previous_route()),
@@ -93,7 +47,7 @@ async fn global_on_key(key: KeyEvent) -> InputHandled {
     }
 }
 
-fn on_numeral_key(c: char) -> InputHandled {
+fn on_numeral_key(c: char) -> InputHandled<AppEvent> {
     if let Some(digit) = c.to_digit(10) {
         if let Some(route) = Route::iter().nth((digit - 1) as usize) {
             return handled(select_route(route));
@@ -106,25 +60,48 @@ fn on_numeral_key(c: char) -> InputHandled {
 // ==== INPUT UTILS ====
 // =====================
 
-pub enum InputHandled {
-    Handled(Option<AppEvent>),
+pub enum InputHandled<T> {
+    Handled(Option<T>),
     NotHandled,
 }
 
-impl InputHandled {
-    fn is_handled(&self) -> bool {
+impl<T: Clone> InputHandled<T> {
+    pub fn is_handled(&self) -> bool {
         matches!(self, InputHandled::Handled(_))
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> InputHandled<U> {
+        match self {
+            InputHandled::Handled(Some(t)) => InputHandled::Handled(Some(f(t))),
+            InputHandled::Handled(None) => InputHandled::Handled(None),
+            InputHandled::NotHandled => InputHandled::NotHandled,
+        }
+    }
+
+    pub fn unwrap(self) -> Option<T> {
+        match self {
+            InputHandled::Handled(event) => event,
+            InputHandled::NotHandled => None,
+        }
+    }
+
+    pub fn clone(&self) -> InputHandled<T> {
+        match self {
+            InputHandled::Handled(Some(event)) => InputHandled::Handled(Some(event.clone())),
+            InputHandled::Handled(None) => InputHandled::Handled(None),
+            InputHandled::NotHandled => InputHandled::NotHandled,
+        }
     }
 }
 
-pub fn handled(event: AppEvent) -> InputHandled {
+pub fn handled<T>(event: T) -> InputHandled<T> {
     InputHandled::Handled(Some(event))
 }
 
-pub fn handled_empty() -> InputHandled {
+pub fn handled_empty<T>() -> InputHandled<T> {
     InputHandled::Handled(None)
 }
 
-pub fn not_handled() -> InputHandled {
+pub fn not_handled<T>() -> InputHandled<T> {
     InputHandled::NotHandled
 }

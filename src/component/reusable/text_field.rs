@@ -1,4 +1,3 @@
-use crate::event::AppEvent;
 use crate::input::{handled, not_handled, InputHandled};
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
@@ -7,59 +6,6 @@ use ratatui::{
     widgets::{Block, Paragraph},
     Frame,
 };
-use std::collections::HashMap;
-
-pub struct TextFields {
-    pub fields: HashMap<String, TextField>,
-    pub focused: Option<String>,
-}
-
-impl TextFields {
-    pub fn new() -> Self {
-        TextFields {
-            fields: HashMap::new(),
-            focused: None,
-        }
-    }
-
-    pub fn set_focus(&mut self, name: &str) {
-        if self.fields.contains_key(name) {
-            self.focused = Some(name.to_string());
-        } else if name == "None" {
-            self.focused = None;
-        } else {
-            panic!("TextField with name '{}' does not exist", name);
-        }
-    }
-
-    pub fn add(&mut self, name: &str, label: &str, init_value: Option<String>) {
-        if self.fields.contains_key(name) {
-            panic!("TextField with name '{}' already exists", name);
-        }
-        if name.is_empty() {
-            panic!("TextField name cannot be empty");
-        }
-        if name == "None" {
-            panic!("TextField name cannot be called 'None'");
-        }
-        let field = TextField::new(name, label, init_value);
-        self.fields.insert(field.name.clone(), field);
-    }
-
-    pub fn get(&self, name: &str) -> &TextField {
-        match self.fields.get(name) {
-            Some(field) => field,
-            None => panic!("TextField with name '{}' not found", name),
-        }
-    }
-
-    pub fn get_mut(&mut self, name: &str) -> &mut TextField {
-        match self.fields.get_mut(name) {
-            Some(field) => field,
-            None => panic!("TextField with name '{}' not found", name),
-        }
-    }
-}
 
 pub struct TextField {
     pub name: String,
@@ -71,15 +17,19 @@ pub struct TextField {
 }
 
 impl TextField {
-    pub fn new(name: &str, label: &str, init_value: Option<String>) -> Self {
+    pub fn new(name: &str, label: &str) -> Self {
         Self {
             name: name.to_string(),
             label: label.to_string(),
-            value: init_value.unwrap_or(String::new()),
+            value: String::new(),
             input: String::new(),
             character_index: 0,
             is_editing: false,
         }
+    }
+
+    pub fn set_value(&mut self, value: &str) {
+        self.value = value.to_string();
     }
 
     fn reset_cursor(&mut self) {
@@ -144,7 +94,7 @@ fn move_cursor_right(name: &str) -> TextFieldEvent {
 // ==== HANDLERS ====
 // ==================
 
-pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<AppEvent> {
+pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<TextFieldEvent> {
     match e.event_type {
         TextFieldEventType::StartEditing => on_start_editing(state),
         TextFieldEventType::DoneEditing(submit) => on_done_editing(state, submit),
@@ -155,13 +105,13 @@ pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<AppEvent> {
     }
 }
 
-fn on_start_editing(state: &mut TextField) -> Option<AppEvent> {
+fn on_start_editing<T>(state: &mut TextField) -> Option<T> {
     state.is_editing = true;
     state.input = state.value.clone();
     None
 }
 
-fn on_done_editing(state: &mut TextField, submit: bool) -> Option<AppEvent> {
+fn on_done_editing<T>(state: &mut TextField, submit: bool) -> Option<T> {
     if submit {
         state.value = state.input.clone();
     }
@@ -171,25 +121,25 @@ fn on_done_editing(state: &mut TextField, submit: bool) -> Option<AppEvent> {
     None
 }
 
-fn on_move_cursor_left(state: &mut TextField) -> Option<AppEvent> {
+fn on_move_cursor_left<T>(state: &mut TextField) -> Option<T> {
     let cursor_moved_left = state.character_index.saturating_sub(1);
     state.character_index = clamp_cursor(state, cursor_moved_left);
     None
 }
 
-fn on_move_cursor_right(state: &mut TextField) -> Option<AppEvent> {
+fn on_move_cursor_right<T>(state: &mut TextField) -> Option<T> {
     let cursor_moved_right = state.character_index.saturating_add(1);
     state.character_index = clamp_cursor(state, cursor_moved_right);
     None
 }
 
-fn on_enter_char(state: &mut TextField, new_char: char) -> Option<AppEvent> {
+fn on_enter_char(state: &mut TextField, new_char: char) -> Option<TextFieldEvent> {
     let index = byte_index(state);
     state.input.insert(index, new_char);
-    Some(AppEvent::TextField(move_cursor_right(&state.name)))
+    Some(move_cursor_right(&state.name))
 }
 
-fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
+fn on_delete_char(state: &mut TextField) -> Option<TextFieldEvent> {
     let is_not_cursor_leftmost = state.character_index != 0;
     if is_not_cursor_leftmost {
         // Method "remove" is not used on the saved text for deleting the selected char.
@@ -207,7 +157,7 @@ fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
         // Put all characters together except the selected one.
         // By leaving the selected one out, it is forgotten and therefore deleted.
         state.input = before_char_to_delete.chain(after_char_to_delete).collect();
-        Some(AppEvent::TextField(move_cursor_left(&state.name)))
+        Some(move_cursor_left(&state.name))
     } else {
         None
     }
@@ -217,15 +167,7 @@ fn on_delete_char(state: &mut TextField) -> Option<AppEvent> {
 // ==== INPUT ====
 // ===============
 
-pub fn on_key_router(state: &TextFields, name: &str, key: KeyEvent) -> InputHandled {
-    if let Some(text_field) = state.fields.get(name) {
-        on_key(text_field, key)
-    } else {
-        not_handled()
-    }
-}
-
-pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled {
+pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled<TextFieldEvent> {
     match state.is_editing {
         true => match key.code {
             KeyCode::Enter => handled(done_editing(&state.name, true).into()),

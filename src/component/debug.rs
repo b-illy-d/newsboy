@@ -24,6 +24,11 @@ pub fn debug_log<S: Into<String>>(msg: S) {
     logs.push_back(msg.into());
 }
 
+pub fn debug_logs_clear() {
+    let mut logs = DEBUG_LOGS.lock().unwrap();
+    logs.clear();
+}
+
 #[derive(Default)]
 pub struct DebugLogs {
     pub visible: bool,
@@ -44,12 +49,12 @@ impl DebugLogs {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DebugLogsEvent {
     ToggleVisibility,
 }
 
-pub fn toggle_debug_logs() -> InputHandled {
+pub fn toggle_debug_logs() -> InputHandled<AppEvent> {
     handled(DebugLogsEvent::ToggleVisibility.into())
 }
 

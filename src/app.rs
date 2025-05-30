@@ -1,47 +1,40 @@
 use crate::component::{
-    debug::DebugLogs, pubsub::PubsubState, reusable::text_field::TextFields, setup::Setup,
+    debug::DebugLogs,
+    pubsub::PubsubState,
+    setup::{self, Setup},
     topics::TopicsState,
 };
-use crate::input::Focus;
 use crate::route::Route;
 use std::time::Instant;
 
 pub struct App {
     pub route: Route,
-    pub focus: Focus,
     pub last_tick: Instant,
     pub pubsub: PubsubState,
     pub should_quit: bool,
     pub ticks: u64,
     pub topics: TopicsState,
-    pub text_fields: TextFields,
     pub setup: Setup,
     pub debug_logs: DebugLogs,
+    pub help_text: String,
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
             route: Route::Setup,
-            focus: Focus::Global,
             last_tick: Instant::now(),
             pubsub: PubsubState::default(),
             should_quit: false,
             ticks: 0,
             topics: TopicsState::new(),
-            text_fields: TextFields::new(),
             setup: Setup::default(),
             debug_logs: DebugLogs::default(),
+            help_text: String::new(),
         }
     }
 }
 
 pub fn init(state: &mut App) {
-    // Initialize the setup fields
-    let fields = Setup::get_fields_info();
-    for (name, label) in fields {
-        state
-            .text_fields
-            .add(name, label, Some(state.setup.get(name).to_string()));
-    }
+    setup::init(&mut state.setup);
 }

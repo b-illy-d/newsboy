@@ -1,11 +1,12 @@
 use crate::app::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
     widgets::{Block, List, ListState},
     Frame,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TopicInfo {
     pub name: String,
 }
@@ -41,19 +42,11 @@ impl TopicsState {
 // }
 
 pub fn draw(state: &App, f: &mut Frame, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(30), // Left panel
-            Constraint::Percentage(70), // Right panel
-        ])
-        .split(area);
-    draw_left_content(f, chunks[0], state);
-}
-
-fn draw_left_content(f: &mut ratatui::Frame, area: Rect, app: &App) {
-    let list = List::new(app.topics.visibile.iter().map(|topic| topic.name.clone()))
-        .block(Block::bordered().title("Topics"));
+    let list = List::new(state.topics.visibile.iter().map(|topic| topic.name.clone())).block(
+        Block::bordered()
+            .title("Topics")
+            .style(Style::default().fg(Color::LightYellow)),
+    );
 
     f.render_widget(list, area);
 }
