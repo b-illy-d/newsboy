@@ -1,7 +1,7 @@
 use crate::app::App;
 use crate::component::{
     debug::{debug_log, debug_logs_clear, toggle_debug_logs},
-    setup,
+    pubsub,
 };
 use crate::event::{quit, AppEvent};
 use crate::route::{next_route, previous_route, select_route, Route};
@@ -21,7 +21,7 @@ pub async fn on_key(state: &App, key: KeyEvent) -> Option<AppEvent> {
     }
 
     let route_result = match state.route {
-        Route::Setup => setup::on_key(&state.setup, key),
+        Route::Config => pubsub::on_key(&state.pubsub.config, key),
         _ => not_handled(),
     };
 
@@ -94,14 +94,30 @@ impl<T: Clone> InputHandled<T> {
     }
 }
 
+pub trait IntoHandled<U> {
+    fn into_handled(self) -> InputHandled<U>;
+}
+
+impl<T, U> IntoHandled<U> for InputHandled<T>
+where
+    U: From<T>,
+{
+    fn into_handled(self) -> InputHandled<U> {
+        match self {
+            InputHandled::Handled(e) => InputHandled::Handled(e.map(Into::into)),
+            InputHandled::NotHandled => InputHandled::NotHandled,
+        }
+    }
+}
+
 pub fn handled<T>(event: T) -> InputHandled<T> {
     InputHandled::Handled(Some(event))
 }
 
-pub fn handled_empty<T>() -> InputHandled<T> {
-    InputHandled::Handled(None)
-}
-
 pub fn not_handled<T>() -> InputHandled<T> {
     InputHandled::NotHandled
+}
+
+pub fn handled_empty<T>() -> InputHandled<T> {
+    InputHandled::Handled(None)
 }

@@ -1,6 +1,11 @@
-use crate::input::{handled, not_handled, InputHandled};
+use std::usize;
+
+use crate::{
+    component::debug::debug_log,
+    input::{handled, handled_empty, not_handled, InputHandled},
+};
 use ratatui::{
-    crossterm::event::{KeyCode, KeyEvent},
+    crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::{Position, Rect},
     style::{Style, Stylize},
     widgets::{Block, Paragraph},
@@ -28,8 +33,8 @@ impl TextField {
         }
     }
 
-    pub fn set_value(&mut self, value: &str) {
-        self.value = value.to_string();
+    pub fn set_value(&mut self, value: String) {
+        self.value = value;
     }
 
     fn reset_cursor(&mut self) {
@@ -46,9 +51,15 @@ pub enum TextFieldEventType {
     StartEditing,
     DoneEditing(bool),
     InputChar(String),
-    DeleteChar,
-    MoveCursorLeft,
-    MoveCursorRight,
+    DeleteChar(usize, CursorDirection),
+    MoveCursor(usize, CursorDirection),
+    ValueChanged,
+}
+
+#[derive(Debug, Clone)]
+pub enum CursorDirection {
+    Left,
+    Right,
 }
 
 #[derive(Debug, Clone)]
@@ -78,57 +89,145 @@ fn enter_char(name: &str, c: char) -> TextFieldEvent {
     )
 }
 
-fn delete_char(name: &str) -> TextFieldEvent {
-    TextFieldEvent::new(name.to_string(), TextFieldEventType::DeleteChar)
+fn delete_left(name: &str, number: usize) -> TextFieldEvent {
+    TextFieldEvent::new(
+        name.to_string(),
+        TextFieldEventType::DeleteChar(number, CursorDirection::Left),
+    )
 }
 
-fn move_cursor_left(name: &str) -> TextFieldEvent {
-    TextFieldEvent::new(name.to_string(), TextFieldEventType::MoveCursorLeft)
+fn delete_right(name: &str, number: usize) -> TextFieldEvent {
+    TextFieldEvent::new(
+        name.to_string(),
+        TextFieldEventType::DeleteChar(number, CursorDirection::Right),
+    )
 }
 
-fn move_cursor_right(name: &str) -> TextFieldEvent {
-    TextFieldEvent::new(name.to_string(), TextFieldEventType::MoveCursorRight)
+fn delete_left_by_word(state: &TextField) -> TextFieldEvent {
+    TextFieldEvent::new(
+        state.name.to_string(),
+        TextFieldEventType::DeleteChar(distance_to_prev_non_alpha(state), CursorDirection::Left),
+    )
+}
+
+fn delete_right_by_word(state: &TextField) -> TextFieldEvent {
+    TextFieldEvent::new(
+        state.name.to_string(),
+        TextFieldEventType::DeleteChar(distance_to_next_non_alpha(state), CursorDirection::Right),
+    )
+}
+
+fn move_cursor_left(name: &str, distance: usize) -> TextFieldEvent {
+    TextFieldEvent::new(
+        name.to_string(),
+        TextFieldEventType::MoveCursor(distance, CursorDirection::Left),
+    )
+}
+
+fn move_cursor_right(name: &str, distance: usize) -> TextFieldEvent {
+    TextFieldEvent::new(
+        name.to_string(),
+        TextFieldEventType::MoveCursor(distance, CursorDirection::Right),
+    )
+}
+
+fn move_cursor_left_by_word(state: &TextField) -> TextFieldEvent {
+    TextFieldEvent::new(
+        state.name.to_string(),
+        TextFieldEventType::MoveCursor(distance_to_prev_non_alpha(state), CursorDirection::Left),
+    )
+}
+
+fn move_cursor_right_by_word(state: &TextField) -> TextFieldEvent {
+    TextFieldEvent::new(
+        state.name.to_string(),
+        TextFieldEventType::MoveCursor(distance_to_next_non_alpha(state), CursorDirection::Right),
+    )
+}
+
+fn value_changed(name: &str) -> TextFieldEvent {
+    TextFieldEvent::new(name.to_string(), TextFieldEventType::ValueChanged)
+}
+
+fn distance_to_next_non_alpha(state: &TextField) -> usize {
+    let input = &state.input;
+    let current_index = byte_index(state);
+    let next_non_alpha = input
+        .char_indices()
+        .skip(current_index + 1)
+        .find(|(_, c)| !c.is_alphanumeric())
+        .map_or(input.len(), |(i, _)| i);
+    next_non_alpha - current_index
+}
+
+fn distance_to_prev_non_alpha(state: &TextField) -> usize {
+    let input = &state.input;
+    let current_index = byte_index(state);
+    let prev_non_alpha = input
+        .char_indices()
+        .rev()
+        .skip(input.len() - current_index + 1)
+        .find(|(_, c)| !c.is_alphanumeric())
+        .map_or(0, |(i, _)| i);
+    current_index - prev_non_alpha
 }
 
 // ==================
 // ==== HANDLERS ====
 // ==================
 
-pub fn on_event(state: &mut TextField, e: TextFieldEvent) -> Option<TextFieldEvent> {
-    match e.event_type {
+pub fn on_event(state: &mut TextField, e: TextFieldEventType) -> Option<TextFieldEvent> {
+    match e {
         TextFieldEventType::StartEditing => on_start_editing(state),
         TextFieldEventType::DoneEditing(submit) => on_done_editing(state, submit),
         TextFieldEventType::InputChar(c) => on_enter_char(state, c.chars().next().unwrap()),
-        TextFieldEventType::DeleteChar => on_delete_char(state),
-        TextFieldEventType::MoveCursorLeft => on_move_cursor_left(state),
-        TextFieldEventType::MoveCursorRight => on_move_cursor_right(state),
+        TextFieldEventType::DeleteChar(n, d) => on_delete_char(state, n, d),
+        TextFieldEventType::MoveCursor(n, d) => on_move_cursor(state, n, d),
+        TextFieldEventType::ValueChanged => None,
     }
 }
 
-fn on_start_editing<T>(state: &mut TextField) -> Option<T> {
+fn on_start_editing(state: &mut TextField) -> Option<TextFieldEvent> {
     state.is_editing = true;
     state.input = state.value.clone();
     None
 }
 
-fn on_done_editing<T>(state: &mut TextField, submit: bool) -> Option<T> {
+fn on_done_editing(state: &mut TextField, submit: bool) -> Option<TextFieldEvent> {
     if submit {
-        state.value = state.input.clone();
+        state.set_value(state.input.clone());
     }
     state.input.clear();
     state.reset_cursor();
     state.is_editing = false;
-    None
+    if submit {
+        Some(value_changed(&state.name))
+    } else {
+        None
+    }
 }
 
-fn on_move_cursor_left<T>(state: &mut TextField) -> Option<T> {
-    let cursor_moved_left = state.character_index.saturating_sub(1);
+fn on_move_cursor(
+    state: &mut TextField,
+    distance: usize,
+    direction: CursorDirection,
+) -> Option<TextFieldEvent> {
+    match direction {
+        CursorDirection::Left => on_move_cursor_left(state, distance),
+        CursorDirection::Right => on_move_cursor_right(state, distance),
+    }
+}
+
+fn on_move_cursor_left(state: &mut TextField, distance: usize) -> Option<TextFieldEvent> {
+    debug_log(format!("Move left by {distance}"));
+    let cursor_moved_left = state.character_index.saturating_sub(distance);
     state.character_index = clamp_cursor(state, cursor_moved_left);
     None
 }
 
-fn on_move_cursor_right<T>(state: &mut TextField) -> Option<T> {
-    let cursor_moved_right = state.character_index.saturating_add(1);
+fn on_move_cursor_right(state: &mut TextField, distance: usize) -> Option<TextFieldEvent> {
+    debug_log(format!("Move right by {distance}"));
+    let cursor_moved_right = state.character_index.saturating_add(distance);
     state.character_index = clamp_cursor(state, cursor_moved_right);
     None
 }
@@ -136,31 +235,44 @@ fn on_move_cursor_right<T>(state: &mut TextField) -> Option<T> {
 fn on_enter_char(state: &mut TextField, new_char: char) -> Option<TextFieldEvent> {
     let index = byte_index(state);
     state.input.insert(index, new_char);
-    Some(move_cursor_right(&state.name))
+    Some(move_cursor_right(&state.name, 1))
 }
 
-fn on_delete_char(state: &mut TextField) -> Option<TextFieldEvent> {
+fn on_delete_char(
+    state: &mut TextField,
+    number: usize,
+    direction: CursorDirection,
+) -> Option<TextFieldEvent> {
+    match direction {
+        CursorDirection::Left => on_delete_left(state, number),
+        CursorDirection::Right => on_delete_right(state, number),
+    }
+}
+
+fn on_delete_left(state: &mut TextField, number: usize) -> Option<TextFieldEvent> {
     let is_not_cursor_leftmost = state.character_index != 0;
     if is_not_cursor_leftmost {
-        // Method "remove" is not used on the saved text for deleting the selected char.
-        // Reason: Using remove on String works on bytes instead of the chars.
-        // Using remove would require special care because of char boundaries.
-
         let current_index = state.character_index;
-        let from_left_to_current_index = current_index - 1;
-
-        // Getting all characters before the selected character.
+        let from_left_to_current_index = current_index - number;
         let before_char_to_delete = state.input.chars().take(from_left_to_current_index);
-        // Getting all characters after selected character.
         let after_char_to_delete = state.input.chars().skip(current_index);
-
-        // Put all characters together except the selected one.
-        // By leaving the selected one out, it is forgotten and therefore deleted.
         state.input = before_char_to_delete.chain(after_char_to_delete).collect();
-        Some(move_cursor_left(&state.name))
+        Some(move_cursor_left(&state.name, number))
     } else {
         None
     }
+}
+
+fn on_delete_right(state: &mut TextField, number: usize) -> Option<TextFieldEvent> {
+    let is_not_cursor_rightmost = state.character_index < state.input.chars().count();
+    if is_not_cursor_rightmost {
+        let current_index = state.character_index;
+        let from_current_index_to_right = current_index + number;
+        let before_char_to_delete = state.input.chars().take(current_index);
+        let after_char_to_delete = state.input.chars().skip(from_current_index_to_right);
+        state.input = before_char_to_delete.chain(after_char_to_delete).collect();
+    };
+    None
 }
 
 // ===============
@@ -171,10 +283,38 @@ pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled<TextFieldEvent> 
     match state.is_editing {
         true => match key.code {
             KeyCode::Enter => handled(done_editing(&state.name, true).into()),
-            KeyCode::Char(k) => handled(enter_char(&state.name, k).into()),
-            KeyCode::Backspace => handled(delete_char(&state.name).into()),
-            KeyCode::Left => handled(move_cursor_left(&state.name).into()),
-            KeyCode::Right => handled(move_cursor_right(&state.name).into()),
+            KeyCode::Char(k) if key.modifiers.is_empty() => {
+                handled(enter_char(&state.name, k).into())
+            }
+            KeyCode::Backspace => handled(delete_left(&state.name, 1).into()),
+            KeyCode::Delete => {
+                if state.character_index < state.input.chars().count() {
+                    handled(delete_right(&state.name, 1).into())
+                } else {
+                    handled_empty()
+                }
+            }
+            KeyCode::Left => handled(move_cursor_left(&state.name, 1).into()),
+            KeyCode::Right => handled(move_cursor_right(&state.name, 1).into()),
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
+                handled(move_cursor_right_by_word(state).into())
+            }
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::ALT) => {
+                handled(move_cursor_left_by_word(state).into())
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::ALT) => {
+                handled(delete_right_by_word(state).into())
+            }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::ALT) => {
+                handled(delete_left_by_word(state).into())
+            }
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                handled(delete_left_by_word(state).into())
+            }
+            KeyCode::Home => handled(move_cursor_left(&state.name, byte_index(state)).into()),
+            KeyCode::End => {
+                handled(move_cursor_right(&state.name, state.input.char_indices().count()).into())
+            }
             KeyCode::Esc => handled(done_editing(&state.name, false).into()),
             _ => not_handled(),
         },

@@ -7,7 +7,11 @@ use ratatui::{
 
 use crate::{
     app::App,
-    component::{debug, header, setup, topics},
+    component::{
+        debug, header,
+        pubsub::{self, draw_pubsub_status},
+        topics,
+    },
     route::Route,
 };
 
@@ -31,8 +35,8 @@ pub fn draw(state: &App, f: &mut Frame) {
 
 fn draw_main(state: &App, f: &mut Frame, area: Rect) {
     match state.route {
-        Route::Setup => {
-            setup::draw(&state.setup, f, area);
+        Route::Config => {
+            pubsub::draw_config_page(&state.pubsub.config, f, area);
         }
         Route::Topics => {
             topics::draw(state, f, area);
@@ -49,17 +53,15 @@ fn draw_footer(state: &App, f: &mut Frame, area: Rect) {
         .style(Style::default().light_green());
     f.render_widget(border, area);
 
-    let [app_area, static_area] = Layout::horizontal([Constraint::Min(0), Constraint::Length(50)])
-        .margin(1)
-        .areas(area);
-
-    let app_help_paragraph =
-        Paragraph::new(state.help_text.clone()).style(Style::default().fg(Color::Yellow));
-    f.render_widget(app_help_paragraph, app_area);
+    let [status_area, static_area] =
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(50)])
+            .margin(1)
+            .areas(area);
 
     let static_paragraph = Paragraph::new("Press ? for help ".to_string())
         .style(Style::default().fg(Color::Yellow))
         .alignment(Right);
 
+    draw_pubsub_status(&state.pubsub, f, status_area);
     f.render_widget(static_paragraph, static_area);
 }

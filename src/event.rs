@@ -1,14 +1,25 @@
 use crate::app::App;
-use crate::component::debug::debug_log;
 use crate::component::{
-    debug::{self, DebugLogsEvent},
-    pubsub::{self, PubsubEvent},
-    setup::{self, SetupEvent},
+    debug::{self, debug_log, DebugLogsEvent},
+    pubsub::{self, ConfigEvent, PubsubEvent},
 };
 use crate::input::{on_key, InputHandled};
 use crate::route;
 use crate::route::RouteEvent;
+use once_cell::sync::OnceCell;
 use ratatui::crossterm::event::KeyEvent;
+use tokio::sync::mpsc;
+
+pub static TX: OnceCell<mpsc::Sender<AppEvent>> = OnceCell::new();
+
+pub fn send_event(event: AppEvent) -> impl std::future::Future<Output = ()> {
+    let tx = TX.get().expect("TX channel not initialized");
+    async move {
+        if tx.send(event).await.is_err() {
+            debug_log("Failed to send event".to_string());
+        }
+    }
+}
 
 // ================
 // ==== EVENTS ====
@@ -21,8 +32,6 @@ pub enum AppEvent {
     Pubsub(PubsubEvent),
     Route(RouteEvent),
     Debug(DebugLogsEvent),
-    Setup(SetupEvent),
-    HelpText(String),
     Quit,
 }
 
@@ -30,15 +39,11 @@ pub fn quit() -> AppEvent {
     AppEvent::Quit
 }
 
-pub fn status_text(text: &str) -> AppEvent {
-    AppEvent::HelpText(text.to_string())
-}
-
 // ==================
 // ==== HANDLERS ====
 // ==================
 
-pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
+pub async fn on_event(state: &mut App, e: AppEvent) {
     if !matches!(e, AppEvent::Tick) {
         debug_log(format!("IN {:?}", e));
     }
@@ -51,17 +56,15 @@ pub async fn on_event(state: &mut App, e: AppEvent) -> Option<AppEvent> {
             debug::on_event(&mut state.debug_logs, event);
             None
         }
-        AppEvent::Setup(event) => setup::on_event(&mut state.setup, event),
-        AppEvent::HelpText(text) => {
-            state.help_text = text;
-            None
-        }
         AppEvent::Quit => on_quit(state),
     };
     if let Some(ref chain) = ret {
         debug_log(format!("OUT {:?}", chain));
     }
-    ret
+    match ret {
+        Some(event) => send_event(event).await,
+        None => {}
+    }
 }
 
 pub fn on_tick(state: &mut App) -> Option<AppEvent> {
@@ -95,14 +98,20 @@ impl From<RouteEvent> for AppEvent {
     }
 }
 
-impl From<SetupEvent> for AppEvent {
-    fn from(event: SetupEvent) -> Self {
-        AppEvent::Setup(event)
+impl From<ConfigEvent> for AppEvent {
+    fn from(event: ConfigEvent) -> Self {
+        AppEvent::Pubsub(PubsubEvent::Config(event))
     }
 }
 
 impl From<DebugLogsEvent> for AppEvent {
     fn from(event: DebugLogsEvent) -> Self {
         AppEvent::Debug(event)
+    }
+}
+
+impl From<PubsubEvent> for AppEvent {
+    fn from(event: PubsubEvent) -> Self {
+        AppEvent::Pubsub(event)
     }
 }

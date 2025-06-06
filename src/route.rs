@@ -1,5 +1,5 @@
 use crate::app::App;
-use crate::component::{debug::debug_log, setup};
+use crate::component::debug::debug_log;
 use crate::event::AppEvent;
 use ratatui::{style::Stylize, text::Line};
 use strum::IntoEnumIterator;
@@ -8,8 +8,8 @@ use strum_macros::{Display, EnumIter, FromRepr};
 #[derive(Debug, Default, Clone, Copy, Display, FromRepr, EnumIter)]
 pub enum Route {
     #[default]
-    #[strum(serialize = "Setup")]
-    Setup,
+    #[strum(serialize = "Config")]
+    Config,
     #[strum(serialize = "Topics")]
     Topics,
 }
@@ -56,29 +56,11 @@ pub fn select_route(route: Route) -> AppEvent {
 }
 
 pub fn on_event(state: &mut App, event: RouteEvent) -> Option<AppEvent> {
-    on_leave_route(state);
     let new_route = match event {
         RouteEvent::Select(route) => route,
         RouteEvent::Next => state.route.next(),
         RouteEvent::Prev => state.route.previous(),
     };
     state.route = new_route;
-    on_arrive_route(state, new_route)
-}
-
-fn on_leave_route(state: &mut App) {
-    match state.route {
-        Route::Setup => setup::on_leave(&mut state.setup),
-        Route::Topics => {
-            // Handle topics route leave if needed
-        }
-    }
-}
-
-fn on_arrive_route(state: &mut App, route: Route) -> Option<AppEvent> {
-    match route {
-        Route::Setup => setup::on_arrive(&mut state.setup),
-        Route::Topics => {}
-    };
     None
 }

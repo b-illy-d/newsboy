@@ -16,8 +16,9 @@ use view::draw;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = ratatui::init();
-
     let (tx, mut rx) = mpsc::channel::<AppEvent>(128);
+
+    event::TX.set(tx.clone()).expect("Failed to set TX channel");
 
     // Tick Loop
     {
@@ -58,19 +59,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        terminal.draw(|f| draw(&app, f))?;
-
         match rx.recv().await {
-            Some(e) => match on_event(&mut app, e).await {
-                Some(e) => {
-                    if tx.send(e).await.is_err() {
-                        break;
-                    }
-                }
-                None => {}
-            },
+            Some(e) => on_event(&mut app, e).await,
             None => {}
-        }
+        };
+
+        terminal.draw(|f| draw(&app, f))?;
     }
 
     ratatui::restore();
