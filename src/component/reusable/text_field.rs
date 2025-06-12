@@ -296,6 +296,8 @@ pub fn on_key(state: &TextField, key: KeyEvent) -> InputHandled<TextFieldEvent> 
             }
             KeyCode::Left => handled(move_cursor_left(&state.name, 1).into()),
             KeyCode::Right => handled(move_cursor_right(&state.name, 1).into()),
+            KeyCode::Up => handled_empty(),
+            KeyCode::Down => handled_empty(),
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
                 handled(move_cursor_right_by_word(state).into())
             }

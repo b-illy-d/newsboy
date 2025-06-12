@@ -7,7 +7,7 @@ use crate::{
                 self, draw_simple_text_field, TextField, TextFieldEvent, TextFieldEventType,
             },
         },
-        topics::TopicInfo,
+        topics::{TopicInfo, Topics},
     },
     event::{send_event, AppEvent},
     input::{handled, not_handled, InputHandled, IntoHandled},
@@ -19,9 +19,9 @@ use ratatui::{
         KeyEvent,
     },
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Stylize},
-    text::Line,
-    widgets::{Block, Borders},
+    style::{Color, Style, Stylize},
+    text::{Line, Text},
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 use std::collections::HashMap;
@@ -36,7 +36,7 @@ pub struct Pubsub {
     pub config: PubsubConfig,
     pub status: PubsubStatus,
     pub project_id: Option<String>,
-    pub topics: Vec<TopicInfo>,
+    pub topics: Topics,
 }
 
 pub struct PubsubStatus {
@@ -86,7 +86,7 @@ impl Pubsub {
             config: PubsubConfig::default(),
             status: PubsubStatus::default(),
             project_id: Some(project_id.to_string()),
-            topics: Vec::new(),
+            topics: Topics::new(),
         })
     }
 }
@@ -307,9 +307,10 @@ pub fn init_config(state: &mut PubsubConfig) {
 #[derive(Debug, Clone)]
 pub enum PubsubEvent {
     Connect,
+    GetTopics,
     Config(ConfigEvent),
     ChangeProjectId(String),
-    Topics(Vec<TopicInfo>),
+    GotTopics(Vec<TopicInfo>),
 }
 
 pub fn set_project_id(id: String) -> PubsubEvent {
@@ -368,11 +369,23 @@ fn unfocus() -> ConfigEvent {
 
 pub async fn on_event(state: &mut Pubsub, e: PubsubEvent) -> Option<AppEvent> {
     match e {
-        PubsubEvent::Connect => on_connect_to_pubsub(state).await,
-        PubsubEvent::ChangeProjectId(id) => on_change_project_id(state, id).await,
-        PubsubEvent::Config(event) => on_config_event(&mut state.config, event).await,
-        PubsubEvent::Topics(topics) => {
-            state.topics = topics;
+        PubsubEvent::Connect => {
+            on_connect_to_pubsub(state).await;
+            None
+        }
+        PubsubEvent::ChangeProjectId(id) => {
+            on_change_project_id(state, id).await;
+            None
+        }
+        PubsubEvent::Config(event) => {
+            on_config_event(&mut state.config, event).await;
+            None
+        }
+        PubsubEvent::GetTopics => on_get_topics(state).await,
+        PubsubEvent::GotTopics(topics) => {
+            state.status.topics = topics.len();
+            state.topics.set_topics(topics);
+            None
         }
     };
     None
@@ -394,7 +407,7 @@ async fn on_connect_to_pubsub(state: &mut Pubsub) {
     if let Some(id) = state.project_id.as_ref() {
         match Pubsub::new(id.clone(), "localhost".to_string(), 8065, true).await {
             Ok(pubsub) => {
-                state.client = Some(pubsub.client.unwrap());
+                state.client = pubsub.client;
                 state.status.connection = ConnectionStatus::Connected;
                 state.status.info = Some("Connected to Pub/Sub".to_string());
             }
@@ -408,6 +421,26 @@ async fn on_connect_to_pubsub(state: &mut Pubsub) {
         debug_log("Project ID is empty!!".to_string());
         state.status.info = Some("Project ID is empty".to_string());
         return;
+    }
+}
+
+async fn on_get_topics(state: &mut Pubsub) -> Option<AppEvent> {
+    if let Some(client) = &state.client {
+        match client.get_topics(None).await {
+            Ok(topics) => {
+                let topic_infos: Vec<TopicInfo> =
+                    topics.into_iter().map(|t| TopicInfo { name: t }).collect();
+                Some(PubsubEvent::GotTopics(topic_infos).into())
+            }
+            Err(e) => {
+                state.status.connection = ConnectionStatus::Disconnected;
+                state.status.info = Some(format!("Failed to get topics: {}", e));
+                None
+            }
+        }
+    } else {
+        state.status.info = Some("Not connected to Pub/Sub".to_string());
+        None
     }
 }
 
@@ -540,15 +573,18 @@ pub fn draw_config_page(state: &PubsubConfig, f: &mut Frame, area: Rect) {
         None => false,
         Some(ref name) => state.fields.get(name).unwrap().is_editing(),
     };
+    let help_text = Text::from(vec![
+        Line::default(),
+        Line::from(match is_editing {
+            true => EDITING_HELP.to_string(),
+            false => VIEWING_HELP.to_string(),
+        }),
+        Line::default(),
+    ])
+    .style(Style::default().fg(Color::Gray));
+
     let block = Block::default()
         .title(TITLE.to_string())
-        .title_bottom(
-            Line::from(match is_editing {
-                true => EDITING_HELP.to_string(),
-                false => VIEWING_HELP.to_string(),
-            })
-            .right_aligned(),
-        )
         .light_blue()
         .fg(Color::LightCyan)
         .bg(Color::Black)
@@ -556,12 +592,17 @@ pub fn draw_config_page(state: &PubsubConfig, f: &mut Frame, area: Rect) {
     f.render_widget(block, area);
 
     let [content_area] = Layout::default()
-        .vertical_margin(2)
-        .horizontal_margin(10)
+        .vertical_margin(1)
+        .horizontal_margin(2)
         .constraints([Constraint::Length(100)])
         .direction(Direction::Horizontal)
         .areas(area);
-    draw_fields(state, f, content_area);
+    let [help_text_area, fields_area] = Layout::default()
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .direction(Direction::Vertical)
+        .areas(content_area);
+    f.render_widget(Paragraph::new(help_text), help_text_area);
+    draw_fields(state, f, fields_area);
 }
 
 fn draw_fields(state: &PubsubConfig, f: &mut Frame, area: Rect) {
@@ -605,10 +646,10 @@ pub fn draw_pubsub_status(state: &Pubsub, f: &mut Frame, area: Rect) {
         .info
         .clone()
         .unwrap_or_else(|| "No info".to_string());
-    let topics_count = state.topics.len();
+    let topics_count = state.status.topics;
 
     let paragraph = Paragraph::new(format!(
-        "Status: {}\nTopics: {}\nInfo: {}",
+        "Status: {} Topics: {} Info: {}",
         status_text, topics_count, info_text
     ))
     .wrap(Wrap { trim: true });

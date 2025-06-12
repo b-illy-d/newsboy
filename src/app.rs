@@ -1,7 +1,7 @@
 use crate::component::{
     debug::DebugLogs,
     pubsub::{self, Pubsub},
-    topics::TopicsState,
+    topics::Topics,
 };
 use crate::route::Route;
 use std::time::Instant;
@@ -12,7 +12,7 @@ pub struct App {
     pub pubsub: Pubsub,
     pub should_quit: bool,
     pub ticks: u64,
-    pub topics: TopicsState,
+    pub topics: Topics,
     pub debug_logs: DebugLogs,
 }
 
@@ -24,7 +24,7 @@ impl App {
             pubsub: Pubsub::default(),
             should_quit: false,
             ticks: 0,
-            topics: TopicsState::new(),
+            topics: Topics::new(),
             debug_logs: DebugLogs::default(),
         }
     }
